@@ -225,7 +225,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=560651bf'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=55d93f46'); });
 </script>
 </head>
 <body>
@@ -615,7 +615,7 @@ function perNote() {
 }
 function halfNote() {
   var a = Number($('c-amt').value) || 0;
-  var w = Math.floor(a / 2), c = a - w;
+  var c = Math.floor(a / 2), w = a - c; // 1円のはしたはわたちゃん側
   $('c-half').innerHTML = a ? '💙 ちぇちゃん ' + yen(c) + ' ・ 💗 わたちゃん ' + yen(w) + ' の2行に分けて入れるよ（メモに合計 ' + yen(a) + '）。<br>ちぇちゃんがわたちゃんに渡す金額が <b>' + yen(w) + ' 減る</b>よ' : '半分ずつ、ちぇちゃんとわたちゃんの2行に分けて入れるよ';
 }
 function readPhoto(inp) {
