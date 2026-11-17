@@ -240,7 +240,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=552b21ab'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=db4150fe'); });
 </script>
 </head>
 <body>
@@ -522,7 +522,52 @@ function viewSum() {
   w += '<table class="calc num" style="margin-top:12px">' + row('', 'dカードの支払い（' + payDay + '）', s.cardTotal) +
     '<tr><td class="op"></td><td>三井住友に入れておく金額<br><span class="muted">カード代＋PiTaPaなど</span></td><td>' + yen(s.deposit) + '</td></tr></table>';
   h += fold('fold-flow', '💰 わたちゃんのお金の流れ', yen(s.rest), w);
+
+  // ▸ 借入（2026-11-18）：あと何か月・利息いくら・早く返したらどうなるか
+  (m.loans || []).forEach(function (l, li) {
+    h += fold('fold-loan' + li, '💳 ' + esc(l.name), isFinite(l.months) ? 'あと' + ymText(l.months) : '', loanBody(l, li), S.openFold === 'fold-loan' + li);
+  });
   return h;
+}
+function ymText(n) { if (!isFinite(n)) return '終わらない'; var y = Math.floor(n / 12), mo = n % 12; return (y ? y + '年' : '') + (mo ? mo + 'か月' : (y ? '' : '0か月')); }
+function loanBody(l, li) {
+  var b = '<div style="text-align:center;margin:4px 0 10px"><div class="muted" style="font-size:12px">残り（目安）</div><div class="num" style="font-size:26px;font-weight:700">' + yen(l.balance) + '</div>' +
+    '<div class="muted" style="font-size:11px">' + md(l.base) + 'の残高 ' + yen(l.baseBalance) + ' から、返済日ごとに計算</div></div>';
+  if (!isFinite(l.months)) return b + '<div class="alert">今の返済額だと、利息のほうが多くて残高がへらないよ</div>';
+  b += '<table class="calc num">' +
+    '<tr><td class="op"></td><td>終わる予定</td><td><b>' + l.end + '</b><br><span class="muted">あと' + ymText(l.months) + '</span></td></tr>' +
+    '<tr><td class="op"></td><td>これから払う利息</td><td style="color:var(--wata)"><b>' + yen(l.interest) + '</b></td></tr></table>';
+  var pi = l.nextInterest + l.nextPrincipal, wi = pi ? Math.round(l.nextInterest / pi * 100) : 0;
+  b += '<div style="margin:14px 0 4px;font-size:13px">次の返済 <b class="num">' + yen(l.pay) + '</b> のうち</div>' +
+    '<div style="display:flex;height:14px;border-radius:7px;overflow:hidden"><div style="width:' + wi + '%;background:var(--wata)"></div><div style="flex:1;background:var(--oie)"></div></div>' +
+    '<div class="num" style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px"><span style="color:var(--wata)">利息 ' + yen(l.nextInterest) + '</span><span style="color:var(--oie)">へる元金 ' + yen(l.nextPrincipal) + '</span></div>';
+  b += '<div style="margin:16px 0 4px;font-size:13px"><b>もし早く返したら</b></div><table class="calc num" style="font-size:13px"><tr class="muted"><td></td><td style="text-align:right">早く終わる</td><td>利息がへる</td></tr>';
+  l.options.forEach(function (o) {
+    b += '<tr><td style="text-align:left">' + o.label + '</td><td style="text-align:right">' + ymText(o.saveMonths) + '</td><td style="color:var(--oie)">' + yen(o.saveInterest) + '</td></tr>';
+  });
+  b += '</table><p class="muted" style="font-size:11px;margin:8px 0 0">年利' + l.rate + '%・利息は「残高×年利÷12」の目安。実際は日割りなので少しずれるよ。返すかどうかは貯金とのバランスで決めてね</p>';
+  b += '<button class="btn" style="width:100%;margin-top:10px" onclick="openLoan(' + li + ')">✏️ 残高を入れ直す・設定</button>';
+  return b;
+}
+function openLoan(li) {
+  var l = S.m.loans[li];
+  E = { loan: l };
+  var h = '<div class="grab"></div><b style="font-size:17px">' + esc(l.name) + '</b>';
+  h += '<label class="f">今の残高（アプリやWeb明細で見た金額）</label><input class="in num" id="l-bal" type="number" inputmode="numeric" value="' + l.balance + '">';
+  h += '<div class="muted" style="font-size:11px;margin-top:4px">入れ直すと、今日の残高として計算し直すよ</div>';
+  h += '<label class="f">年利（%）</label><input class="in num" id="l-rate" type="number" inputmode="decimal" step="0.01" value="' + l.rate + '">';
+  h += '<label class="f">毎月の返済額</label><input class="in num" id="l-pay" type="number" inputmode="numeric" value="' + l.pay + '">';
+  h += '<label class="f">返済日（0なら月末）</label><input class="in num" id="l-day" type="number" inputmode="numeric" value="' + l.payDay + '">';
+  h += '<div class="btns"><button class="btn" onclick="closeSheet()">やめる</button><button class="btn primary" id="l-save" onclick="saveLoanEdit()">保存</button></div>';
+  openSheet(h);
+}
+function saveLoanEdit() {
+  var l = E.loan, patch = { rate: Number($('l-rate').value), pay: Number($('l-pay').value), payDay: Number($('l-day').value) || 0 };
+  var bal = Number($('l-bal').value);
+  if (!(bal >= 0) || !(patch.pay > 0)) return toast('金額を入れてね');
+  if (bal !== l.balance) patch.balance = bal;
+  $('l-save').disabled = true;
+  call('saveLoan', l.row, patch).then(function (loans) { S.m.loans = loans; closeSheet(); render(); toast('保存したよ'); }).catch(function (e) { $('l-save').disabled = false; fail(e); });
 }
 /** LINEなどに貼れる「今月のまとめ」の文章を作って、共有（またはコピー） */
 function shareSummary() {
