@@ -225,7 +225,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=f11036bb'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=adb4aa4a'); });
 </script>
 </head>
 <body>
@@ -802,6 +802,12 @@ function enemyCard(e, d) {
       } else {
         h += '<div class="r"><span>' + (d.yearly ? '今月 ' + yen(r.month) : '') + '</span><span>予算なし</span></div>';
       }
+      (r.plans || []).forEach(function (p) {
+        var col = p.state === '今月' ? 'var(--accent)' : 'var(--sub)';
+        h += '<div class="num" style="font-size:12px;margin-top:4px;color:' + col + '">📅 毎年' + p.month + '月分：' + esc(p.name) + ' ' + yen(p.amount) +
+          (p.who ? '（' + esc(p.who.replace('ちゃん', '')) + '）' : '') + ' ・ ' + (p.state === '今月' ? '<b>今月来るよ</b>' : p.state === 'これから' ? 'これから' : '今年はもう来たはず') + '</div>';
+      });
+      if (r.fromPlan && d.yearly) h += '<div class="muted" style="font-size:11px">予算は予定の合計（' + yen(r.budget) + '）に合わせてるよ</div>';
       h += '</div>';
     });
   }
