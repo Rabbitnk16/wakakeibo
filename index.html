@@ -240,7 +240,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=33f79958'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=552b21ab'); });
 </script>
 </head>
 <body>
@@ -341,7 +341,7 @@ function render() {
   Array.prototype.forEach.call(document.querySelectorAll('nav button'), function (b) { b.classList.toggle('on', b.dataset.tab === S.tab); });
   if (!m) return;
   var v = $('view');
-  if (S.role === 'che') v.innerHTML = S.tab === 'cpay' ? viewChePay() : viewCheSum();
+  if (S.role === 'che') v.innerHTML = S.tab === 'cpay' ? viewChePay() : S.tab === 'ckakei' ? viewCheKakei() : viewCheSum();
   else if (S.tab === 'sort') v.innerHTML = viewSort();
   else if (S.tab === 'list') v.innerHTML = viewList();
   else if (S.tab === 'sum') v.innerHTML = viewSum();
@@ -484,17 +484,20 @@ function viewSum() {
   h += '<h2>何に使った？</h2><div class="card">' + donut(m.byCategory) + '</div>';
   h += '<h2>月ごとに使った分</h2><div class="card">' + bars(m.trend) + '<p class="muted" style="margin:8px 0 0;font-size:12px">カードなどで使った分だけ（固定費は入ってない）</p></div>';
 
+  h += '<button class="btn" style="width:100%;margin-bottom:12px" onclick="shareSummary()">📤 ちぇちゃんに今月のまとめを送る</button>';
+
   // ▸ 計算のなかみ（ひとつの表に）
   var row = function (op, label, v, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="op">' + op + '</td><td>' + label + '</td><td>' + yen(v) + '</td></tr>'; };
   var c = '<table class="calc num">';
   c += '<tr><td colspan="3" class="sec" style="color:var(--oie)">🏠 ふたりで半分ずつ</td></tr>';
   c += row('', '使った分', s.detail['お家']) + row('＋', '固定費（家賃など）', s.fixHalf) + row('÷2', '<b>ひとり分</b>', s.perPerson, 'tot');
   c += '<tr><td colspan="3" class="sec" style="color:var(--che)">💙 ちぇちゃん</td></tr>';
-  c += row('', 'ひとり分', s.perPerson) + row('＋', '使った分', s.detail['ちぇちゃん']) + row('＋', '固定費', s.fixChe);
-  if (s.chePaid) c += row('−', '立て替えた分', s.chePaid);
+  // 立て替えた分は「ちぇちゃんの半分」は使った分から外して、「わたちゃんの半分」だけを引く形で見せる（結果は同じ）
+  c += row('', 'ひとり分', s.perPerson) + row('＋', '使った分', s.detail['ちぇちゃん'] - (s.chePaidChe || 0)) + row('＋', '固定費', s.fixChe);
+  if (s.chePaidWata) c += row('−', '立て替えてくれた分<br><span class="muted">わたちゃんの半分</span>', s.chePaidWata);
   c += row('＝', '<b>もらう金額</b>', s.che, 'tot');
   c += '<tr><td colspan="3" class="sec" style="color:var(--wata)">💗 わたちゃん</td></tr>';
-  c += row('', 'ひとり分', s.perPerson) + row('＋', '使った分', s.detail['わたちゃん']) + row('＋', '固定費', s.fixWata) + row('＝', '<b>自分で持つ金額</b>', s.wata, 'tot');
+  c += row('', 'ひとり分', s.perPerson) + row('＋', '使った分' + (s.chePaidWata ? '<br><span class="muted">うち ちぇちゃんが立て替えた半分 ' + yen(s.chePaidWata) + '</span>' : ''), s.detail['わたちゃん']) + row('＋', '固定費', s.fixWata) + row('＝', '<b>自分で持つ金額</b>', s.wata, 'tot');
   c += '</table>';
   h += fold('fold-calc', '🧾 計算のなかみ', '', c);
 
@@ -520,6 +523,33 @@ function viewSum() {
     '<tr><td class="op"></td><td>三井住友に入れておく金額<br><span class="muted">カード代＋PiTaPaなど</span></td><td>' + yen(s.deposit) + '</td></tr></table>';
   h += fold('fold-flow', '💰 わたちゃんのお金の流れ', yen(s.rest), w);
   return h;
+}
+/** LINEなどに貼れる「今月のまとめ」の文章を作って、共有（またはコピー） */
+function shareSummary() {
+  var m = S.m, s = m.summary, info = m.info;
+  var oieTx = m.txs.filter(function (t) { return t.who === 'お家' || t.payer === 'ちぇちゃん'; });
+  var cheTx = m.txs.filter(function (t) { return t.who === 'ちぇちゃん' && t.payer !== 'ちぇちゃん'; });
+  var tot = function (xs) { return xs.reduce(function (a, t) { return a + t.amount; }, 0); };
+  var cats = {}; oieTx.forEach(function (t) { var c = t.category || 'その他'; cats[c] = (cats[c] || 0) + t.amount; });
+  var top = Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; }).slice(0, 3).map(function (c) { return '・' + c + ' ' + yen(cats[c]); });
+  var lines = [
+    $('eto').textContent + ' わかけいぼ ' + info.label + '（' + md(info.from) + '〜' + md(info.to) + '）',
+    '',
+    '💙 ちぇにお願いする金額：' + yen(s.che) + '（' + md(info.pay) + '払いの分）',
+    '',
+    '🏠 お家で使った分：' + yen(tot(oieTx)),
+    '💙 ちぇ個人で使った分：' + yen(tot(cheTx)),
+    '📌 固定費：お家 ' + yen(s.fixHalf) + ' ／ ちぇ ' + yen(s.fixChe)
+  ];
+  if (top.length) lines.push('', 'お家でよく使ったもの', top.join('\n'));
+  // ちぇちゃんに送るので、まだの項目はお家・ちぇちゃんの分だけ（わたちゃん個人の項目は出さない）
+  var todo = m.items.filter(function (i) { return (i.kubun === '折半' || i.kubun === 'ちぇちゃん') && i.monthly && (i.amount === '' || i.amount === null); }).map(function (i) { return i.name; });
+  if (s.undecided || todo.length) lines.push('', '※まだ途中の金額だよ（' + [s.undecided ? '振り分け中' : '', todo.length ? todo.join('・') + 'がまだ' : ''].filter(Boolean).join('、') + '）');
+  lines.push('', 'くわしくはアプリで見てね📱');
+  var text = lines.join('\n');
+  if (navigator.share) navigator.share({ text: text }).catch(function () {});
+  else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { toast('コピーしたよ。LINEに貼ってね'); });
+  else openSheet('<div class="grab"></div><b>この文章をコピーしてね</b><textarea class="in" style="height:260px;margin-top:10px">' + esc(text) + '</textarea><div class="btns"><button class="btn" onclick="closeSheet()">閉じる</button></div>');
 }
 function fold(id, title, right, body, open) {
   return '<details class="fold" id="' + id + '"' + (open ? ' open' : '') + '><summary><span>' + title + '</span><span class="num muted">' + right + '</span></summary><div class="foldbody">' + body + '</div></details>';
@@ -754,12 +784,12 @@ function viewCheSum() {
   h += '<h2>計算のなかみ</h2><div class="card"><div class="whohead" style="color:var(--oie)">🏠 二人で折半</div><table class="calc num">';
   h += '<tr><td class="op"></td><td>使った分</td><td>' + yen(s.oie) + '</td></tr>';
   m.itemsHalf.forEach(function (i, k) { h += '<tr><td class="op">＋</td><td>' + esc(i.name) + '</td><td>' + (i.amount === '' || i.amount === null ? '<span style="color:var(--warn)">まだ</span>' : yen(i.amount)) + '</td></tr>'; });
-  h += '<tr class="tot"><td class="op">÷2</td><td>一人当たり</td><td>' + yen(s.perPerson) + '</td></tr></table></div>';
+  h += '<tr class="tot"><td class="op">÷2</td><td>ひとり分</td><td>' + yen(s.perPerson) + '</td></tr></table></div>';
   h += '<div class="card"><div class="whohead" style="color:var(--che)">💙 ちぇちゃん</div><table class="calc num">';
-  h += '<tr><td class="op"></td><td>折半の一人当たり</td><td>' + yen(s.perPerson) + '</td></tr>';
-  h += '<tr><td class="op">＋</td><td>使った分</td><td>' + yen(s.cheDetail) + '</td></tr>';
+  h += '<tr><td class="op"></td><td>ひとり分</td><td>' + yen(s.perPerson) + '</td></tr>';
+  h += '<tr><td class="op">＋</td><td>使った分<br><span class="muted">立て替えた分は入れてない</span></td><td>' + yen(s.cheDetail - (s.chePaidChe || 0)) + '</td></tr>';
   m.itemsChe.forEach(function (i) { h += '<tr><td class="op">＋</td><td>' + esc(i.name) + '</td><td>' + (i.amount === '' || i.amount === null ? '<span style="color:var(--warn)">まだ</span>' : yen(i.amount)) + '</td></tr>'; });
-  if (s.chePaid) h += '<tr><td class="op">−</td><td>立て替えた分（合計）<br><span class="muted">半分はちぇちゃんの明細に入ってるので、合計を引く</span></td><td>' + yen(s.chePaid) + '</td></tr>';
+  if (s.chePaidWata) h += '<tr><td class="op">−</td><td>立て替えた分のうち、わたちゃんの半分<br><span class="muted">合計 ' + yen(s.chePaid) + ' をちぇちゃんが払ってるので、わたちゃんの分を返す</span></td><td>' + yen(s.chePaidWata) + '</td></tr>';
   h += '<tr class="tot"><td class="op">＝</td><td>渡す金額</td><td>' + yen(s.che) + '</td></tr></table></div>';
   var list = function (title, f) {
     var xs = m.txs.filter(f), tot = xs.reduce(function (a, t) { return a + t.amount; }, 0);
@@ -776,6 +806,20 @@ function viewCheSum() {
   return h;
 }
 function title2(t) { return t.shown || t.name; }
+/** ちぇちゃん用「今月の家計」：お家で使った分と、ちぇちゃん個人で使った分（わたちゃん個人の分は出さない） */
+function viewCheKakei() {
+  var k = S.m.kakei, n = k.now, h = '';
+  var diff = function (a, b) { var d = a - b; return b ? '<span class="muted" style="font-size:12px">先月より ' + (d >= 0 ? '+' : '−') + yen(Math.abs(d)) + '</span>' : ''; };
+  h += '<div class="card" style="padding:4px 16px">' +
+    '<div class="sumrow"><div><b>🏠 お家で使った分</b><small>立て替えた分もふくむ</small></div><div style="text-align:right"><b class="num" style="color:var(--oie)">' + yen(n.oie) + '</b><br>' + diff(n.oie, k.prev.oie) + '</div></div>' +
+    '<div class="sumrow"><div><b>💙 自分で使った分</b><small>ちぇちゃん個人の分</small></div><div style="text-align:right"><b class="num" style="color:var(--che)">' + yen(n.che) + '</b><br>' + diff(n.che, k.prev.che) + '</div></div></div>';
+  if (k.up.length) h += '<div class="alert" style="cursor:default">📈 先月より増えてるのは ' + k.up.map(function (u) { return '<b>' + esc(u.category) + '</b>（+' + yen(u.diff) + '）'; }).join('・') + '</div>';
+  h += '<p class="muted" style="font-size:12px;margin:0 4px 8px">' + md(S.m.info.from) + '〜' + md(S.m.info.to) + 'に使った分。カードの明細が入るたびに増えていくよ</p>';
+  h += '<h2>🏠 お家で何に使った？</h2><div class="card">' + donut(n.catOie) + '</div>';
+  h += '<h2>💙 自分で何に使った？</h2><div class="card">' + donut(n.catChe) + '</div>';
+  h += '<h2>月ごとに使った分</h2><div class="card">' + bars(k.trend) + '<p class="muted" style="margin:8px 0 0;font-size:12px">緑がお家、青がちぇちゃん個人（わたちゃん個人の分は入ってない）</p></div>';
+  return h;
+}
 function viewChePay() {
   var xs = cheGroups(S.m.txs);
   var h = '<button class="chebtn" onclick="openChe()"><span class="ic2">📷</span><span>立て替えた分を入れる<small>お家の物をd払い・現金などで払ったとき。半分はわたちゃんが負担するよ</small></span></button>';
@@ -956,8 +1000,8 @@ $('next').onclick = function () { changeMonth(1); };
 (window.WK_KEY ? call('getBootstrap') : new Promise(function () {})).then(function (b) {
   S.periods = b.periods; S.categories = b.categories; S.role = b.role || 'wata';
   if (S.role === 'che') {
-    $('tabs').innerHTML = '<button data-tab="csum"><span class="ic">💙</span>今月の精算</button><button data-tab="cpay"><span class="ic">📷</span>払った分</button>';
-    S.tab = 'csum';
+    $('tabs').innerHTML = '<button data-tab="ckakei"><span class="ic">📊</span>今月の家計</button><button data-tab="csum"><span class="ic">💙</span>今月の精算</button><button data-tab="cpay"><span class="ic">📷</span>払った分</button>';
+    S.tab = 'ckakei';
   }
   setMonth(b.month);
   if (S.role !== 'che' && !undecided().length) S.tab = 'sum', render();
