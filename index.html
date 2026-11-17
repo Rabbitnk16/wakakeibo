@@ -225,7 +225,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=55d93f46'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=f11036bb'); });
 </script>
 </head>
 <body>
@@ -450,7 +450,13 @@ function viewSum() {
   var m = S.m, s = m.summary, h = '';
   if (s.undecided) h += '<div class="alert" onclick="go(\'sort\')">🗂️ まだ振り分けてない明細が <b>' + s.undecided + '件（' + yen(s.undecidedAmount) + '）</b>あるよ。決めると金額が変わります →</div>';
   if (s.todoItems.length) h += '<div class="alert" onclick="document.getElementById(\'fixed\').scrollIntoView({behavior:\'smooth\'})">✍️ 今月の金額がまだ入ってない：<b>' + s.todoItems.map(esc).join('・') + '</b> →</div>';
-  h += '<div class="card hero"><div class="lbl">💙 ちぇちゃんが払う金額</div><div class="big num">' + yen(s.che) + '</div><div class="muted">わたちゃんの負担 <b class="num" style="color:var(--wata)">' + yen(s.wata) + '</b></div></div>';
+  // いちばん上は「今の発生額」：明細でこれまでに使った分＋入ってる固定費（2026-11-17 本人の希望）
+  var used = m.txs.reduce(function (a, t) { return a + t.amount; }, 0), fixed = s.fixHalf + s.fixChe + s.fixWata;
+  h += '<div class="card hero"><div class="lbl" style="color:var(--accent)">🧮 今月これまでの家計の合計</div><div class="big num">' + yen(used + fixed) + '</div>' +
+    '<div class="muted num">明細 ' + yen(used) + ' ＋ 固定費 ' + yen(fixed) + '</div>' +
+    '<div class="muted" style="font-size:12px;margin-top:4px">' + md(m.info.from) + '〜' + md(m.info.to) + 'の分。明細が増えると増えていくよ</div></div>';
+  h += '<div class="card" style="padding:12px 16px"><div class="row"><span>💙 精算：ちぇちゃんが払う金額</span><b class="num" style="font-size:18px;color:var(--che)">' + yen(s.che) + '</b></div>' +
+    '<div class="row muted" style="margin-top:4px"><span>💗 わたちゃんの負担</span><b class="num" style="color:var(--wata)">' + yen(s.wata) + '</b></div></div>';
 
   h += '<h2>計算のなかみ</h2><div class="card">';
   h += '<div class="whohead" style="color:var(--oie)">🏠 二人で折半</div><table class="calc num">';
