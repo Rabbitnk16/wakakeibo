@@ -225,7 +225,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=adb4aa4a'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=ae446659'); });
 </script>
 </head>
 <body>
@@ -390,7 +390,7 @@ function listBody(txs, total) {
   txs.forEach(function (t) {
     var w = whoOf(t.who), need = t.status !== '確定' || !t.who;
     var che = t.payer === 'ちぇちゃん';
-    h += '<div class="item" onclick="' + (che ? 'openChe' : 'openEdit') + '(\'' + esc(t.id) + '\')"><span class="dot ' + (need ? 'none' : w.cls) + '"></span><div class="mid"><div class="t">' + esc(title(t)) + (need ? '<span class="tag">要確認</span>' : '') + (che ? '<span class="tag che">ちぇ払い</span>' : '') + '</div>';
+    h += '<div class="item" onclick="' + (che ? 'openChe' : 'openEdit') + '(\'' + esc(t.id) + '\')"><span class="dot ' + (need ? 'none' : w.cls) + '"></span><div class="mid"><div class="t">' + esc(title(t)) + (need ? '<span class="tag">要確認</span>' : '') + (che ? '<span class="tag che">ちぇ払い</span>' : '') + (t.noBudget ? '<span class="tag" style="background:var(--soft);color:var(--sub)">予算外</span>' : '') + '</div>';
     h += '<div class="s"><span style="color:var(--e' + t.enemyEff + ');font-weight:700">' + '①②③④'.charAt(t.enemyEff - 1) + '</span> ' + md(t.date) + ' ・ ' + esc(t.category || 'その他') + (t.memo ? ' ・ 📝' + esc(t.memo) : '') + (t.shown ? ' ・ ' + esc(t.name) : '') + '</div></div>';
     h += '<div class="a num">' + yen(t.amount) + '</div></div>';
   });
@@ -420,6 +420,7 @@ function openEdit(id) {
   h += '<button data-e="" class="' + (t.enemy === '' ? 'on' : '') + '" onclick="segEnemy(this)">カテゴリ<br>どおり</button>';
   [1, 2, 3, 4].forEach(function (e) { h += '<button data-e="' + e + '" style="color:var(--e' + e + ')" class="' + (t.enemy === e ? 'on' : '') + '" onclick="segEnemy(this)">' + '①②③④'.charAt(e - 1) + '<br>' + ENEMIES[e].name.replace('の', '<br>').slice(0, 9) + '</button>'; });
   h += '</div><p class="muted" style="margin:4px 0 0;font-size:11px">例：Amazonで買った新しいiPhone → ④。ふだんはカテゴリで自動で決まるよ</p>';
+  h += '<label class="toggle"><input type="checkbox" id="e-nobud"' + (t.noBudget ? ' checked' : '') + '> 予算に入れない（ふたりの旅行じゃない、など）</label>';
   h += '<label class="f">カテゴリ</label><select class="in" id="e-cat">' + S.categories.map(function (c) { return '<option' + (c === t.category ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
   h += '<div class="orig-box">元の明細：' + esc(t.name) + '<br>' + esc(t.date) + ' ・ ' + esc(t.source) + (t.payType ? ' ・ ' + esc(t.payType) : '') + (t.reason ? ' ・ ' + esc(t.reason) : '') + '</div>';
   h += '<div class="btns"><button class="btn" onclick="closeSheet()">やめる</button><button class="btn primary" id="e-save" onclick="saveEdit()">保存</button></div>';
@@ -436,6 +437,7 @@ function saveEdit() {
   if ($('e-cat').value !== t.category) patch.category = $('e-cat').value;
   if (E.whoTouched) patch.who = E.who;
   if (E.enemy !== t.enemy) patch.enemy = E.enemy;
+  if ($('e-nobud').checked !== !!t.noBudget) patch.noBudget = $('e-nobud').checked;
   if (rw !== t.ruleWho) { opts.ruleWho = rw; if (rw && !E.who) return toast('「だれの」を選んでね'); if (rw && !patch.who) patch.who = E.who; }
   if (!Object.keys(patch).length && opts.ruleWho === undefined) return closeSheet();
   $('e-save').disabled = true;
