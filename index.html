@@ -185,6 +185,21 @@ svg text { fill: var(--sub); font-size: 10px; font-family: inherit; }
 details.raw { font-size: 11px; color: var(--sub); margin-top: 8px; }
 details.raw pre { white-space: pre-wrap; background: var(--soft); padding: 8px; border-radius: 8px; max-height: 160px; overflow: auto; }
 
+/* まとめ（折りたたみ） */
+.sumrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px dashed var(--line); }
+.sumrow:last-child { border-bottom: 0; }
+.sumrow small { display: block; color: var(--sub); font-size: 11px; font-weight: 500; }
+.sumrow > b { font-size: 19px; white-space: nowrap; }
+.alert a { cursor: pointer; display: inline-block; padding: 2px 0; }
+details.fold { background: var(--card); border-radius: 18px; box-shadow: var(--shadow); margin-bottom: 10px; overflow: hidden; }
+details.fold summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 16px; cursor: pointer; font-weight: 700; }
+details.fold summary::-webkit-details-marker { display: none; }
+details.fold summary::before { content: '▸'; color: var(--sub); margin-right: 2px; transition: transform .2s; display: inline-block; }
+details.fold[open] summary::before { transform: rotate(90deg); }
+details.fold summary > span:first-child { flex: 1; }
+.foldbody { padding: 0 16px 14px; }
+.calc td.sec, .calc td.sec:last-child { font-weight: 700; padding-top: 12px; border-bottom: 0; text-align: left; }
+
 /* 取り込み */
 .drop { display: block; border: 2px dashed var(--line); border-radius: 18px; padding: 26px 16px; text-align: center; cursor: pointer; background: var(--card); }
 .drop b { display: block; font-size: 16px; margin-bottom: 4px; }
@@ -225,7 +240,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=ae446659'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=8d3ce60a'); });
 </script>
 </head>
 <body>
@@ -449,56 +464,67 @@ $('veil').onclick = closeSheet;
 
 /* ---------- まとめ ---------- */
 function viewSum() {
+  // 2026-11-17 作り直し：大事な数字だけ上に、細かいところは「▸」で開く（本人：長い・数字が多い・何の金額かわかりにくい）
   var m = S.m, s = m.summary, h = '';
-  if (s.undecided) h += '<div class="alert" onclick="go(\'sort\')">🗂️ まだ振り分けてない明細が <b>' + s.undecided + '件（' + yen(s.undecidedAmount) + '）</b>あるよ。決めると金額が変わります →</div>';
-  if (s.todoItems.length) h += '<div class="alert" onclick="document.getElementById(\'fixed\').scrollIntoView({behavior:\'smooth\'})">✍️ 今月の金額がまだ入ってない：<b>' + s.todoItems.map(esc).join('・') + '</b> →</div>';
-  // いちばん上は「今の発生額」：明細でこれまでに使った分＋入ってる固定費（2026-11-17 本人の希望）
   var used = m.txs.reduce(function (a, t) { return a + t.amount; }, 0), fixed = s.fixHalf + s.fixChe + s.fixWata;
+  var payDay = md(m.info.pay);
+
   h += '<div class="card hero"><div class="lbl" style="color:var(--accent)">🧮 今月これまでの家計の合計</div><div class="big num">' + yen(used + fixed) + '</div>' +
-    '<div class="muted num">明細 ' + yen(used) + ' ＋ 固定費 ' + yen(fixed) + '</div>' +
-    '<div class="muted" style="font-size:12px;margin-top:4px">' + md(m.info.from) + '〜' + md(m.info.to) + 'の分。明細が増えると増えていくよ</div></div>';
-  h += '<div class="card" style="padding:12px 16px"><div class="row"><span>💙 精算：ちぇちゃんが払う金額</span><b class="num" style="font-size:18px;color:var(--che)">' + yen(s.che) + '</b></div>' +
-    '<div class="row muted" style="margin-top:4px"><span>💗 わたちゃんの負担</span><b class="num" style="color:var(--wata)">' + yen(s.wata) + '</b></div></div>';
+    '<div class="muted num">カードなどで使った分 ' + yen(used) + ' ＋ 家賃などの固定費 ' + yen(fixed) + '</div></div>';
 
-  h += '<h2>計算のなかみ</h2><div class="card">';
-  h += '<div class="whohead" style="color:var(--oie)">🏠 二人で折半</div><table class="calc num">';
-  h += '<tr><td class="op"></td><td>お家の明細</td><td>' + yen(s.detail['お家']) + '</td></tr>';
-  h += '<tr><td class="op">＋</td><td>固定費（家賃・水道など）</td><td>' + yen(s.fixHalf) + '</td></tr>';
-  h += '<tr class="tot"><td class="op">÷2</td><td>一人当たり</td><td>' + yen(s.perPerson) + '</td></tr></table></div>';
-  [['ちぇちゃん', 'che', '💙', s.fixChe, s.che], ['わたちゃん', 'wata', '💗', s.fixWata, s.wata]].forEach(function (x) {
-    h += '<div class="card"><div class="whohead" style="color:var(--' + x[1] + ')">' + x[2] + ' ' + x[0] + '</div><table class="calc num">';
-    h += '<tr><td class="op"></td><td>折半の一人当たり</td><td>' + yen(s.perPerson) + '</td></tr>';
-    h += '<tr><td class="op">＋</td><td>' + x[0] + 'の明細</td><td>' + yen(s.detail[x[0]]) + '</td></tr>';
-    h += '<tr><td class="op">＋</td><td>' + x[0] + 'の固定費</td><td>' + yen(x[3]) + '</td></tr>';
-    if (x[0] === 'ちぇちゃん' && s.chePaid) h += '<tr><td class="op">−</td><td>ちぇちゃんが立て替えた分（合計）<br><span class="muted">半分ずつ明細に入ってるので、合計を引く</span></td><td>' + yen(s.chePaid) + '</td></tr>';
-    h += '<tr class="tot"><td class="op">＝</td><td>' + (x[0] === 'ちぇちゃん' ? '払う金額' : '負担') + '</td><td>' + yen(x[4]) + '</td></tr></table></div>';
-  });
+  h += '<div class="card" style="padding:4px 16px">' +
+    '<div class="sumrow"><div><b>💙 ちぇちゃんからもらう</b><small>' + payDay + 'のカード払いの分</small></div><b class="num" style="color:var(--che)">' + yen(s.che) + '</b></div>' +
+    '<div class="sumrow"><div><b>💗 わたちゃんが自分で持つ</b><small>半分の生活費＋自分の分</small></div><b class="num" style="color:var(--wata)">' + yen(s.wata) + '</b></div></div>';
 
-  h += '<h2 id="fixed">固定費・手入力の項目' + (m.itemsFromTemplate ? '（テンプレから）' : '') + '</h2><div class="card">';
+  var notes = [];
+  if (s.undecided) notes.push('<a onclick="go(\'sort\')">🗂️ 振り分けがまだ <b>' + s.undecided + '件</b> →</a>');
+  if (s.todoItems.length) notes.push('<a onclick="openFold(\'fold-fixed\')">✍️ まだ入ってない：<b>' + s.todoItems.map(esc).join('・') + '</b> →</a>');
+  if (notes.length) h += '<div class="alert">' + notes.join('<br>') + '<div style="font-size:11px;margin-top:2px">入れると上の金額が変わるよ</div></div>';
+
+  h += '<h2>何に使った？</h2><div class="card">' + donut(m.byCategory) + '</div>';
+  h += '<h2>月ごとに使った分</h2><div class="card">' + bars(m.trend) + '<p class="muted" style="margin:8px 0 0;font-size:12px">カードなどで使った分だけ（固定費は入ってない）</p></div>';
+
+  // ▸ 計算のなかみ（ひとつの表に）
+  var row = function (op, label, v, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="op">' + op + '</td><td>' + label + '</td><td>' + yen(v) + '</td></tr>'; };
+  var c = '<table class="calc num">';
+  c += '<tr><td colspan="3" class="sec" style="color:var(--oie)">🏠 ふたりで半分ずつ</td></tr>';
+  c += row('', 'お家で使った分', s.detail['お家']) + row('＋', 'お家の固定費（家賃など）', s.fixHalf) + row('÷2', '<b>ひとり分</b>', s.perPerson, 'tot');
+  c += '<tr><td colspan="3" class="sec" style="color:var(--che)">💙 ちぇちゃん</td></tr>';
+  c += row('', 'ひとり分', s.perPerson) + row('＋', 'ちぇちゃんが使った分', s.detail['ちぇちゃん']) + row('＋', 'ちぇちゃんの固定費', s.fixChe);
+  if (s.chePaid) c += row('−', 'ちぇちゃんが立て替えた分', s.chePaid);
+  c += row('＝', '<b>もらう金額</b>', s.che, 'tot');
+  c += '<tr><td colspan="3" class="sec" style="color:var(--wata)">💗 わたちゃん</td></tr>';
+  c += row('', 'ひとり分', s.perPerson) + row('＋', 'わたちゃんが使った分', s.detail['わたちゃん']) + row('＋', 'わたちゃんの固定費', s.fixWata) + row('＝', '<b>自分で持つ金額</b>', s.wata, 'tot');
+  c += '</table>';
+  h += fold('fold-calc', '🧾 計算のなかみ', '', c);
+
+  // ▸ 固定費・手入力
+  var f = '';
   ['折半', 'ちぇちゃん', 'わたちゃん', '収支', 'カード合計'].forEach(function (k) {
     var its = m.items.filter(function (i) { return i.kubun === k; });
     if (!its.length && k === 'カード合計') return;
-    h += '<div class="fxgroup">' + ({ '折半': '🏠 折半', 'ちぇちゃん': '💙 ちぇちゃん', 'わたちゃん': '💗 わたちゃん', '収支': '💰 収支', 'カード合計': '💳 カード（手入力）' })[k] + '</div>';
+    f += '<div class="fxgroup">' + ({ '折半': '🏠 お家（半分ずつ）', 'ちぇちゃん': '💙 ちぇちゃん', 'わたちゃん': '💗 わたちゃん', '収支': '💰 収入・貯金', 'カード合計': '💳 カード（手入力）' })[k] + '</div>';
     its.forEach(function (i) {
       var todo = i.amount === '' || i.amount === null;
-      h += '<div class="fx" onclick="openItem(' + m.items.indexOf(i) + ')"><div class="n">' + esc(i.name) + (i.memo ? '<small>' + esc(i.memo) + '</small>' : '') + '</div>';
-      h += '<div class="v num' + (todo ? ' todo' : '') + '">' + (todo ? '未入力 ✍️' : yen(i.amount)) + '</div></div>';
+      f += '<div class="fx" onclick="openItem(' + m.items.indexOf(i) + ')"><div class="n">' + esc(i.name) + (i.memo ? '<small>' + esc(i.memo) + '</small>' : '') + '</div>';
+      f += '<div class="v num' + (todo ? ' todo' : '') + '">' + (todo ? '未入力 ✍️' : yen(i.amount)) + '</div></div>';
     });
-    if (k !== 'カード合計') h += '<div class="fx" onclick="openItem(-1,\'' + k + '\')"><div class="n muted">＋ 項目を追加</div></div>';
+    if (k !== 'カード合計') f += '<div class="fx" onclick="openItem(-1,\'' + k + '\')"><div class="n muted">＋ 項目を追加</div></div>';
   });
-  h += '</div>';
+  h += fold('fold-fixed', '📌 固定費・手で入れる項目', s.todoItems.length ? '<span class="tag">' + s.todoItems.length + '件まだ</span>' : yen(fixed), f, S.openFold === 'fold-fixed');
 
-  h += '<h2>お金の流れ（わたちゃん）</h2><div class="card"><table class="calc num">';
-  h += '<tr><td class="op"></td><td>収入</td><td>' + yen(s.income) + '</td></tr>';
-  h += '<tr><td class="op">−</td><td>わたちゃんの負担</td><td>' + yen(s.wata) + '</td></tr>';
-  h += '<tr class="tot"><td class="op">＝</td><td>残金</td><td style="color:' + (s.rest < 0 ? 'var(--wata)' : 'var(--ink)') + '">' + yen(s.rest) + '</td></tr></table>';
-  h += '<table class="calc num" style="margin-top:14px"><tr><td class="op"></td><td>dカード支払い合計</td><td>' + yen(s.cardTotal) + '</td></tr>';
-  h += '<tr><td class="op"></td><td>三井住友に入れておく額<br><span class="muted">カード合計＋「入金に含める」項目</span></td><td>' + yen(s.deposit) + '</td></tr></table></div>';
-
-  h += '<h2>何に使った？</h2><div class="card">' + donut(m.byCategory) + '</div>';
-  h += '<h2>月ごとの明細の合計</h2><div class="card">' + bars(m.trend) + '<p class="muted" style="margin:8px 0 0">固定費は入ってない、カード明細だけの合計</p></div>';
+  // ▸ わたちゃんのお金の流れ
+  var w = '<table class="calc num">' + row('', '収入', s.income) + row('−', 'わたちゃんが自分で持つ金額', s.wata) +
+    '<tr class="tot"><td class="op">＝</td><td><b>のこり</b></td><td style="color:' + (s.rest < 0 ? 'var(--wata)' : 'var(--ink)') + '">' + yen(s.rest) + '</td></tr></table>';
+  w += '<table class="calc num" style="margin-top:12px">' + row('', 'dカードの支払い（' + payDay + '）', s.cardTotal) +
+    '<tr><td class="op"></td><td>三井住友に入れておく金額<br><span class="muted">カード代＋PiTaPaなど</span></td><td>' + yen(s.deposit) + '</td></tr></table>';
+  h += fold('fold-flow', '💰 わたちゃんのお金の流れ', yen(s.rest), w);
   return h;
 }
+function fold(id, title, right, body, open) {
+  return '<details class="fold" id="' + id + '"' + (open ? ' open' : '') + '><summary><span>' + title + '</span><span class="num muted">' + right + '</span></summary><div class="foldbody">' + body + '</div></details>';
+}
+function openFold(id) { S.openFold = id; var d = $(id); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth' }); } }
 
 function openItem(idx, kubun) {
   var it = idx >= 0 ? S.m.items[idx] : { kubun: kubun, name: '', amount: '', memo: '', monthly: false, inDeposit: false, isNew: true };
