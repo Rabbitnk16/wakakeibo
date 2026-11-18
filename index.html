@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=7dea1353'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=236d2927'); });
 </script>
 </head>
 <body>
@@ -396,11 +396,29 @@ function viewSort() {
   h += '<div class="subacts"><button class="link" onclick="openEdit(\'' + esc(t.id) + '\')">✏️ 名前・メモ</button><button class="link" onclick="skip(\'' + esc(t.id) + '\')">あとで</button></div></div>';
   return h;
 }
+// 2026-11-18（本人：振り分けがうまくつながらない）：続けてタップすると、前のタップの返事で後のタップが「まだ」に戻っていた。
+// → 保存は軽い返事だけにして、全部の保存が終わってから1回だけ最新を読み直す。読み直しの間にタップしたものは画面の状態を優先
+S.pending = {};
 function pick(id, who) {
   var t = S.m.txs.filter(function (x) { return x.id === id; })[0];
-  t.who = who; t.status = '確定'; render();
-  toast(title(t) + ' → ' + whoOf(who).short);
-  call('updateTx', id, { who: who }, {}).then(function (m) { if (m.info.period === S.period) { var sk = S.skipped; S.m = m; S.skipped = sk; render(); } }).catch(fail);
+  var before = { who: t.who, status: t.status };
+  t.who = who; t.status = '確定'; S.pending[id] = who; render();
+  toast(niceName(t).name + ' → ' + whoOf(who).short);
+  call('updateTx', id, { who: who }, { light: true }).then(function () {
+    delete S.pending[id]; refreshSoon();
+  }).catch(function (e) { delete S.pending[id]; t.who = before.who; t.status = before.status; fail(e); });
+}
+var refreshTimer = null;
+function refreshSoon() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(function () {
+    if (Object.keys(S.pending).length) return; // まだ保存中のものがある → その返事のあとでまた呼ばれる
+    var per = S.period;
+    call('getMonth', per).then(function (m) {
+      if (per !== S.period || Object.keys(S.pending).length || $('sheet').classList.contains('on')) return;
+      var sk = S.skipped, tab = S.tab; S.m = m; S.skipped = sk; S.tab = tab; render();
+    }).catch(function () {});
+  }, 1500);
 }
 function skip(id) { S.skipped[id] = 1; render(); }
 
