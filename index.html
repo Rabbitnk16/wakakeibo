@@ -240,7 +240,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=0767291b'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=570812de'); });
 </script>
 </head>
 <body>
@@ -1015,6 +1015,7 @@ function enemyCard(e, d) {
           (p.who ? '（' + esc(p.who.replace('ちゃん', '')) + '）' : '') + ' ・ ' + (p.state === '今月' ? '<b>今月来るよ</b>' : p.state === 'これから' ? 'これから' : '今年はもう来たはず') + '</div>';
       });
       if (r.fromPlan && d.yearly) h += '<div class="muted" style="font-size:11px">予算は予定の合計（' + yen(r.budget) + '）に合わせてるよ</div>';
+      if ({ '旅行': 1, '食料品・スーパー': 1, '日用品・ドラッグ': 1 }[r.category]) h += '<div class="muted" style="font-size:11px">🏠 お家の分だけ数えてるよ（個人の分は入れてない）</div>';
       h += '</div>';
     });
   }
