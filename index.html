@@ -101,6 +101,9 @@ nav button.on .ic { filter: none; opacity: 1; }
 .item .t { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item .s { color: var(--sub); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item .a { font-weight: 700; white-space: nowrap; }
+.sumseg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--soft); border-radius: 14px; padding: 4px; margin-bottom: 12px; }
+.sumseg button { border: 0; background: none; border-radius: 10px; padding: 8px 0; font-size: 13px; font-weight: 700; color: var(--sub); cursor: pointer; }
+.sumseg button.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
 .dayhd { display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); margin: 14px 6px 4px; font-weight: 700; }
 .dayhd:first-of-type { margin-top: 4px; }
 .mk { letter-spacing: 1px; }
@@ -257,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=94e3b708'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=669bc33b'); });
 </script>
 </head>
 <body>
@@ -510,26 +513,25 @@ function viewSum() {
   var used = m.txs.reduce(function (a, t) { return a + t.amount; }, 0), fixed = s.fixHalf + s.fixChe + s.fixWata;
   var payDay = md(m.info.pay);
 
-  h += '<div class="card hero"><div class="lbl" style="color:var(--accent)">🧮 今月これまでの家計の合計</div><div class="big num">' + yen(used + fixed) + '</div>' +
+  var H = { pay: '', me: '', gr: '' };
+  H.pay += '<div class="card hero"><div class="lbl" style="color:var(--accent)">🧮 今月これまでの家計の合計</div><div class="big num">' + yen(used + fixed) + '</div>' +
     '<div class="muted num">カードなどで使った分 ' + yen(used) + ' ＋ 家賃などの固定費 ' + yen(fixed) + '</div></div>';
 
-  h += '<div class="card" style="padding:4px 16px">' +
+  H.pay += '<div class="card" style="padding:4px 16px">' +
     '<div class="sumrow"><div><b>💙 ちぇちゃんからもらう</b><small>' + payDay + 'のカード払いの分</small></div><b class="num" style="color:var(--che)">' + yen(s.che) + '</b></div>' +
     '<div class="sumrow"><div><b>💗 わたちゃんが自分で持つ</b><small>半分の生活費＋自分の分</small></div><b class="num" style="color:var(--wata)">' + yen(s.wata) + '</b></div></div>';
 
-  h += goalCard(m);
-  h += saveCard(m);
-  h += nwCard(m);
+  H.me += goalCard(m) + saveCard(m) + nwCard(m);
 
   var notes = [];
   if (s.undecided) notes.push('<a onclick="go(\'sort\')">🗂️ 振り分けがまだ <b>' + s.undecided + '件</b> →</a>');
   if (s.todoItems.length) notes.push('<a onclick="openFold(\'fold-fixed\')">✍️ まだ入ってない：<b>' + s.todoItems.map(esc).join('・') + '</b> →</a>');
-  if (notes.length) h += '<div class="alert">' + notes.join('<br>') + '<div style="font-size:11px;margin-top:2px">入れると上の金額が変わるよ</div></div>';
+  if (notes.length) H.pay += '<div class="alert">' + notes.join('<br>') + '<div style="font-size:11px;margin-top:2px">入れると上の金額が変わるよ</div></div>';
 
-  h += '<h2>何に使った？</h2><div class="card">' + donut(m.byCategory) + '</div>';
-  h += '<h2>月ごとに使った分</h2><div class="card">' + bars(m.trend) + '<p class="muted" style="margin:8px 0 0;font-size:12px">カードなどで使った分だけ（固定費は入ってない）</p></div>';
+  H.gr += '<h2 style="margin-top:4px">何に使った？</h2><div class="card">' + donut(m.byCategory) + '</div>';
+  H.gr += '<h2>月ごとに使った分</h2><div class="card">' + bars(m.trend) + '<p class="muted" style="margin:8px 0 0;font-size:12px">カードなどで使った分だけ（固定費は入ってない）</p></div>';
 
-  h += '<button class="btn" style="width:100%;margin-bottom:12px" onclick="shareSummary()">📤 ちぇちゃんに今月のまとめを送る</button>';
+  H.pay += '<button class="btn" style="width:100%;margin-bottom:12px" onclick="shareSummary()">📤 ちぇちゃんに今月のまとめを送る</button>';
 
   // ▸ 計算のなかみ（ひとつの表に）
   var row = function (op, label, v, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="op">' + op + '</td><td>' + label + '</td><td>' + yen(v) + '</td></tr>'; };
@@ -544,7 +546,7 @@ function viewSum() {
   c += '<tr><td colspan="3" class="sec" style="color:var(--wata)">💗 わたちゃん</td></tr>';
   c += row('', 'ひとり分', s.perPerson) + row('＋', '使った分' + (s.chePaidWata ? '<br><span class="muted">うち ちぇちゃんが立て替えた半分 ' + yen(s.chePaidWata) + '</span>' : ''), s.detail['わたちゃん']) + row('＋', '固定費', s.fixWata) + row('＝', '<b>自分で持つ金額</b>', s.wata, 'tot');
   c += '</table>';
-  h += fold('fold-calc', '🧾 計算のなかみ', '', c);
+  H.pay += fold('fold-calc', '🧾 計算のなかみ', '', c);
 
   // ▸ 固定費・手入力
   var f = '';
@@ -559,21 +561,24 @@ function viewSum() {
     });
     if (k !== 'カード合計') f += '<div class="fx" onclick="openItem(-1,\'' + k + '\')"><div class="n muted">＋ 項目を追加</div></div>';
   });
-  h += fold('fold-fixed', '📌 固定費・手で入れる項目', s.todoItems.length ? '<span class="tag">' + s.todoItems.length + '件まだ</span>' : yen(fixed), f, S.openFold === 'fold-fixed');
+  H.pay += fold('fold-fixed', '📌 固定費・手で入れる項目', s.todoItems.length ? '<span class="tag">' + s.todoItems.length + '件まだ</span>' : yen(fixed), f, S.openFold === 'fold-fixed');
 
   // ▸ 貯金（2026-11-18）：先取りした額と、ほんとうに増えた額
-  if (m.savings && m.savings.income) h += fold('fold-save', '🐷 わたちゃんの貯金', syen(m.savings.real), saveBody(m), S.openFold === 'fold-save');
+  if (m.savings && m.savings.income) H.me += fold('fold-save', '🐷 わたちゃんの貯金', syen(m.savings.real), saveBody(m), S.openFold === 'fold-save');
 
   // ▸ カード代の入金
   var w = '<table class="calc num">' + row('', 'dカードの支払い（' + payDay + '）', s.cardTotal) +
     '<tr><td class="op"></td><td>三井住友に入れておく金額<br><span class="muted">カード代＋PiTaPaなど</span></td><td>' + yen(s.deposit) + '</td></tr></table>';
-  h += fold('fold-flow', '💳 三井住友に入れておく金額', yen(s.deposit), w);
+  H.pay += fold('fold-flow', '💳 三井住友に入れておく金額', yen(s.deposit), w);
 
   // ▸ 借入（2026-11-18）：あと何か月・利息いくら・早く返したらどうなるか
   (m.loans || []).forEach(function (l, li) {
-    h += fold('fold-loan' + li, '💳 ' + esc(l.name), isFinite(l.months) ? 'あと' + ymText(l.months) : '', loanBody(l, li), S.openFold === 'fold-loan' + li);
+    H.me += fold('fold-loan' + li, '💳 ' + esc(l.name), isFinite(l.months) ? 'あと' + ymText(l.months) : '', loanBody(l, li), S.openFold === 'fold-loan' + li);
   });
-  return h;
+  // 2026-11-18（本人：まとめが見にくい）→ 3つに分けて切り替え
+  var tab = S.sumTab || 'pay', seg = [['pay', '🧾 精算'], ['me', '💗 わたちゃん'], ['gr', '📊 グラフ']];
+  h = '<div class="sumseg">' + seg.map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" onclick="S.sumTab=\'' + x[0] + '\';render();window.scrollTo(0,0)">' + x[1] + '</button>'; }).join('') + '</div>';
+  return h + H[tab];
 }
 function goalCard(m) {
   var p = m.personal;
@@ -622,7 +627,6 @@ function nwCard(m) {
     h += '<svg viewBox="-4 -4 ' + (W + 8) + ' ' + (H + 8) + '" style="width:100%;height:44px;margin-top:6px"><polyline points="' + pts + '" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>';
   }
   if (!n.invest) h += '<div class="muted" style="font-size:11px;margin-top:4px">NISA・企業型DCの残高を「＋ 口座を追加」（種類：投資）で入れると、増やすに入るよ</div>';
-  h += '<div class="muted" style="font-size:11px;margin-top:2px">守る＋増やす−借金。借金がへっても、貯金がふえても、ここがふえるよ</div>';
   return h + '</div>';
 }
 /* ---------- 使い方ガイド（2026-11-18：初めて見る人でもわかるように） ---------- */
@@ -827,7 +831,7 @@ function shareSummary() {
 function fold(id, title, right, body, open) {
   return '<details class="fold" id="' + id + '"' + (open ? ' open' : '') + '><summary><span>' + title + '</span><span class="num muted">' + right + '</span></summary><div class="foldbody">' + body + '</div></details>';
 }
-function openFold(id) { S.openFold = id; var d = $(id); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth' }); } }
+function openFold(id) { var want = /fold-(save|loan)/.test(id) ? 'me' : /fold-(calc|fixed|flow)/.test(id) ? 'pay' : S.sumTab; if (want && want !== (S.sumTab || 'pay')) { S.sumTab = want; S.openFold = id; render(); } S.openFold = id; var d = $(id); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth' }); } }
 
 function openItem(idx, kubun) {
   var it = idx >= 0 ? S.m.items[idx] : { kubun: kubun, name: '', amount: '', memo: '', monthly: false, inDeposit: false, isNew: true };
