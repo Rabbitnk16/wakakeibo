@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=3fd6939e'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=7dea1353'); });
 </script>
 </head>
 <body>
@@ -1238,12 +1238,13 @@ function viewImp() {
     h += '<dt>明細</dt><dd>' + p.count + '件 ・ ' + yen(p.total) + '</dd>';
     h += '<dt>新しく入る</dt><dd style="color:var(--accent)">' + p.fresh + '件 ・ ' + yen(p.freshTotal) + '</dd>';
     if (p.dup) h += '<dt>取り込み済み</dt><dd class="muted">' + p.dup + '件（飛ばす）</dd>';
+    if (p.stale) h += '<dt>入れ替え</dt><dd style="color:var(--wata)">前の古い分 ' + p.stale + '件・' + yen(p.staleTotal) + ' を消す</dd>';
     if (p.skipped) h += '<dt>読めなかった行</dt><dd class="muted">' + p.skipped + '行</dd>';
     h += '</dl><label class="f">どの月の分にする？</label><select class="in" id="imp-period">' + opts.map(function (o) {
       return '<option value="' + o + '"' + (o === p.period ? ' selected' : '') + '>' + label(o) + (o === p.period ? '（おすすめ）' : '') + '</option>';
     }).join('') + '</select>';
     h += '<p class="muted">月シートと同じく「' + label(p.period) + '」＝' + md(info(p.period).pay) + '払いの明細、という扱い</p>';
-    h += '<div class="btns"><button class="btn" onclick="S.imp=null;render()">やめる</button><button class="btn primary" id="imp-go" onclick="commitImp()"' + (p.fresh ? '' : ' disabled') + '>' + (p.fresh ? p.fresh + '件を取り込む' : '新しい明細はないよ') + '</button></div></div>';
+    h += '<div class="btns"><button class="btn" onclick="S.imp=null;render()">やめる</button><button class="btn primary" id="imp-go" onclick="commitImp()"' + (p.fresh || p.stale ? '' : ' disabled') + '>' + (p.fresh ? p.fresh + '件を取り込む' : p.stale ? '古い分を消す' : '新しい明細はないよ') + '</button></div></div>';
     return h;
   }
   if (S.imp && S.imp.loading) return '<div class="card loading"><span class="spin"></span><div>読み込み中…</div></div>';
@@ -1274,7 +1275,7 @@ function commitImp() {
   $('imp-go').disabled = true; $('imp-go').textContent = '取り込み中…';
   call('commitImport', p.token, per).then(function (r) {
     S.imp = null; S.log = null; S.tab = r.review ? 'sort' : 'sum'; setMonth(r.month);
-    toast(r.added + '件取り込んだよ' + (r.replaced ? '（速報' + r.replaced + '件を置き換え）' : '') + (r.review ? '・要確認' + r.review + '件' : ''));
+    toast(r.added + '件取り込んだよ' + (r.removed ? '・古い分' + r.removed + '件を消した' : '') + (r.review ? '・要確認' + r.review + '件' : ''));
   }).catch(function (e) { S.imp = null; fail(e); });
 }
 function pad(n) { return (n < 10 ? '0' : '') + n; }
