@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=7dfbb41b'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=eaef6580'); });
 </script>
 </head>
 <body>
@@ -373,25 +373,27 @@ function render() {
 /* ---------- 振り分け ---------- */
 function viewSort() {
   var all = S.m.txs.length, list = undecided();
-  if (!all) return '<div class="card done"><div class="big">📭</div><p><b>この月の明細はまだないよ</b></p><p class="muted">「取り込み」からdカードのCSVを入れてね</p><button class="btn primary" onclick="go(\'imp\')">取り込みへ</button></div>';
-  if (!list.length) return '<div class="card done"><div class="big">🎉</div><p><b>全部振り分けできたよ！</b></p><p class="muted">' + all + '件すべて確定</p><button class="btn primary" onclick="go(\'sum\')">精算額を見る</button></div>';
+  if (!all) return '<div class="card done"><div class="big">📭</div><p><b>この月の明細はまだないよ</b></p><button class="btn primary" onclick="go(\'imp\')">取り込みへ</button></div>';
+  if (!list.length) return '<div class="card done"><div class="big">🎉</div><p><b>全部振り分けできたよ！</b></p><button class="btn primary" onclick="go(\'sum\')">まとめを見る</button></div>';
   var rest = list.filter(function (t) { return !S.skipped[t.id]; });
   if (!rest.length) { S.skipped = {}; rest = list; }
   var t = rest[0], sug = t.who;
   var pct = Math.round((all - list.length) / all * 100);
-  var h = '<div class="row muted"><span>あと <b style="color:var(--ink)">' + list.length + '件</b></span><span>' + (all - list.length) + ' / ' + all + ' 件おわり</span></div>';
+  // 2026-11-18 文字へらし
+  var h = '<div class="row muted"><span>あと <b style="color:var(--ink)">' + list.length + '件</b></span></div>';
   h += '<div class="progress"><i style="width:' + pct + '%"></i></div>';
-  h += '<div class="card sortcard"><div class="date">' + esc(t.date) + (t.payType && !/^１?1?回払?$/.test(t.payType.replace('１', '1')) ? ' ・ ' + esc(t.payType) : '') + '</div>';
-  h += '<div class="name">' + esc(title(t)) + '</div>';
-  if (t.shown) h += '<div class="orig">' + esc(t.name) + '</div>';
+  var nn = niceName(t), dm = String(t.date).match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  var dlab = dm ? (+dm[2]) + '/' + (+dm[3]) + '（' + '日月火水木金土'.charAt(new Date(+dm[1], +dm[2] - 1, +dm[3]).getDay()) + '）' : esc(t.date);
+  h += '<div class="card sortcard"><div class="date">' + dlab + (nn.dpay ? '・d払い' : '') + '</div>';
+  h += '<div class="name">' + esc(nn.name) + '</div>';
   h += '<div class="amt num">' + yen(t.amount) + '</div>';
-  h += '<span class="chip' + (/🆕/.test(t.reason) ? ' new' : '') + '">' + esc(t.reason || '要確認') + '</span>';
+  if (/🆕/.test(t.reason)) h += '<span class="chip new">🆕 はじめて</span>';
+  else if (t.source === 'dカード速報') h += '<span class="chip">⚡ 速報</span>';
   if (t.memo) h += '<div class="muted" style="margin-top:8px">📝 ' + esc(t.memo) + '</div>';
   h += '<div class="whobtns">' + WHO.map(function (w) {
     return '<button class="whobtn w-' + w.cls + (sug === w.key ? ' sug' : '') + '" onclick="pick(\'' + esc(t.id) + '\',\'' + w.key + '\')">' + w.short + (sug === w.key ? '<small>たぶんこれ</small>' : '<small>&nbsp;</small>') + '</button>';
   }).join('') + '</div>';
   h += '<div class="subacts"><button class="link" onclick="openEdit(\'' + esc(t.id) + '\')">✏️ 名前・メモ</button><button class="link" onclick="skip(\'' + esc(t.id) + '\')">あとで</button></div></div>';
-  h += '<p class="muted" style="text-align:center">名前を見てもわからないときは「あとで」で飛ばせるよ</p>';
   return h;
 }
 function pick(id, who) {
@@ -1137,48 +1139,41 @@ function viewBud() {
     h += '<div class="card done"><div class="big">👾</div><p><b>家族の予算がまだないよ</b></p><p class="muted">今までの明細から目安を出すから、それを見ながら決めてね</p><button class="btn primary" onclick="openBudget()">予算を決める</button></div>';
   } else {
     var e2 = en[2], over = e2.over;
-    h += '<div class="card bighead"><div class="lbl">' + S.m.info.label + ' ・ ② 毎月の変動費</div>';
-    h += '<div class="big num ' + (over > 0 ? 'over' : 'under') + '">' + (over > 0 ? '+' + yen(over) + ' はみ出し' : 'あと ' + yen(-over)) + '</div>';
-    h += '<div class="muted num">予算 ' + yen(e2.budget) + ' ／ 使った ' + yen(e2.used) + '</div>';
-    var overCats = [2, 3, 4].reduce(function (a, e) { return a.concat(en[e].rows.filter(function (r) { return r.over > 0; })); }, []);
-    if (overCats.length) h += '<p class="muted" style="margin:8px 0 0">はみ出してるのは <b class="over">' + overCats.map(function (r) { return esc(r.category); }).join('・') + '</b></p>';
-    h += '</div>';
+    h += '<div class="card bighead"><div class="lbl">② 毎月の予算</div>';
+    h += '<div class="big num ' + (over > 0 ? 'over' : 'under') + '">' + (over > 0 ? '+' + yen(over) + ' オーバー' : 'あと ' + yen(-over)) + '</div>';
+    h += '<div class="muted num">' + yen(e2.used) + ' ／ ' + yen(e2.budget) + '</div></div>';
   }
   [1, 2, 3, 4].forEach(function (e) { h += enemyCard(e, en[e]); });
   if (hasBudget) h += '<button class="btn" style="width:100%" onclick="openBudget()">✏️ 予算を直す</button>';
-  h += '<p class="muted" style="margin-top:12px">お家・ちぇちゃん・わたちゃんの分をぜんぶ合わせた家族の予算だよ。カテゴリの下に、だれがいくら使ったかの内訳が出る。②は' + S.m.info.label + 'だけ、③④は' + S.period.slice(0, 4) + '年1月分からの合計で比べてるよ。明細の①〜④はカテゴリで自動で決まって、明細ごとに変えることもできる。</p>';
   return h;
 }
 function enemyCard(e, d) {
   var E2 = ENEMIES[e], h = '<div class="enemy"><div class="eh" style="background:var(--e' + e + '-bg);color:var(--e' + e + ')">';
-  h += '<span class="ebadge" style="background:var(--e' + e + ')">' + e + '</span><div class="nm">' + E2.name + '<small>' + E2.sub + '</small></div><div class="tot num">';
-  if (e === 1) h += yen(d.total) + '<small>予算なし</small>';
+  h += '<span class="ebadge" style="background:var(--e' + e + ')">' + e + '</span><div class="nm">' + E2.name + '</div><div class="tot num">';
+  if (e === 1) h += yen(d.total) + '<small>▾</small>';
   else if (d.budget) h += '<span class="' + (d.over > 0 ? 'over' : '') + '">' + yen(d.used) + '</span><small>/ ' + yen(d.budget) + (d.yearly ? '（年）' : '') + '</small>';
   else h += yen(d.yearly ? d.year : d.month) + '<small>' + (d.yearly ? '今年' : '今月') + '・予算なし</small>';
   h += '</div></div><div class="eb">';
   if (e === 1) {
+    h = h.replace('<div class="enemy">', '<details class="enemy e1fold"><summary style="list-style:none">').replace(/<\/div><div class="eb">$/, '</div></summary><div class="eb">');
     if (!d.rows.length) h += '<div class="empty" style="padding:12px">なし</div>';
-    d.rows.forEach(function (r) { h += '<div class="brow"><div class="l"><span>' + esc(r.name) + (r.whoLabel ? ' <span class="muted">（' + r.whoLabel + '）</span>' : '') + (r.fromTx ? ' <span class="muted">（明細）</span>' : '') + '</span><b class="num">' + yen(r.amount) + '</b></div></div>'; });
+    d.rows.forEach(function (r) { h += '<div class="brow"><div class="l"><span>' + esc(r.name) + '</span><b class="num">' + yen(r.amount) + '</b></div></div>'; });
+    return h + '</div></details>';
   } else {
     if (!d.rows.length) h += '<div class="empty" style="padding:12px">' + (d.yearly ? '今年はまだなし' : '今月はなし') + '</div>';
     d.rows.forEach(function (r) {
-      h += '<div class="brow"><div class="l"><span>' + esc(r.category) + '</span><b class="num">' + yen(r.used) + (r.budget ? ' <span class="muted" style="font-weight:500">/ ' + yen(r.budget) + '</span>' : '') + '</b></div>';
-      var bd = whoBreak(r.by);
-      if (bd) h += '<div class="muted num" style="font-size:11px;margin-top:2px">' + bd + '</div>';
+      h += '<div class="brow"><div class="l"><span>' + esc(r.category) + ({ '旅行': 1, '食料品・スーパー': 1, '日用品・ドラッグ': 1 }[r.category] ? ' <small title="お家の分だけ">🏠</small>' : '') + '</span><b class="num">' + yen(r.used) + (r.budget ? ' <span class="muted" style="font-weight:500">/ ' + yen(r.budget) + '</span>' : '') + '</b></div>';
       if (r.budget) {
         var pct = Math.min(100, r.used / r.budget * 100);
         h += '<div class="bar"><i style="width:' + pct.toFixed(1) + '%;background:' + (r.over > 0 ? 'var(--over)' : 'var(--e' + e + ')') + '"></i></div>';
-        h += '<div class="r num"><span>' + (d.yearly ? '今月 ' + yen(r.month) : Math.round(r.used / r.budget * 100) + '%') + '</span>' + (r.over > 0 ? '<span class="over">+' + yen(r.over) + ' はみ出し</span>' : '<span class="under">あと ' + yen(-r.over) + '</span>') + '</div>';
+        h += '<div class="r num"><span></span>' + (r.over > 0 ? '<span class="over">+' + yen(r.over) + '</span>' : '<span class="under">あと ' + yen(-r.over) + '</span>') + '</div>';
       } else {
-        h += '<div class="r"><span>' + (d.yearly ? '今月 ' + yen(r.month) : '') + '</span><span>予算なし</span></div>';
+
       }
       (r.plans || []).forEach(function (p) {
         var col = p.state === '今月' ? 'var(--accent)' : 'var(--sub)';
-        h += '<div class="num" style="font-size:12px;margin-top:4px;color:' + col + '">📅 毎年' + p.month + '月分：' + esc(p.name) + ' ' + yen(p.amount) +
-          (p.who ? '（' + esc(p.who.replace('ちゃん', '')) + '）' : '') + ' ・ ' + (p.state === '今月' ? '<b>今月来るよ</b>' : p.state === 'これから' ? 'これから' : '今年はもう来たはず') + '</div>';
+        h += '<div class="num" style="font-size:12px;margin-top:4px;color:' + col + '">📅 ' + p.month + '月 ' + esc(p.name) + ' ' + yen(p.amount) + (p.state === '今月' ? ' <b>今月</b>' : '') + '</div>';
       });
-      if (r.fromPlan && d.yearly) h += '<div class="muted" style="font-size:11px">予算は予定の合計（' + yen(r.budget) + '）に合わせてるよ</div>';
-      if ({ '旅行': 1, '食料品・スーパー': 1, '日用品・ドラッグ': 1 }[r.category]) h += '<div class="muted" style="font-size:11px">🏠 お家の分だけ数えてるよ（個人の分は入れてない）</div>';
       h += '</div>';
     });
   }
@@ -1249,12 +1244,10 @@ function viewImp() {
     return h;
   }
   if (S.imp && S.imp.loading) return '<div class="card loading"><span class="spin"></span><div>読み込み中…</div></div>';
-  h += '<h2 style="margin-top:4px">ちぇちゃんが払った分</h2>' + '<button class="chebtn" onclick="openChe()"><span class="ic2">📷</span><span>ちぇちゃんが払った分を入れる<small>d払い・現金で払ったお家の物。半分はわたちゃん負担になるよ</small></span></button>';
-  h += '<h2>わたちゃんが現金で払った分</h2><button class="chebtn" onclick="openCash()"><span class="ic2">💴</span><span>現金で払った分を入れる<small>美容院など、カードの明細に出てこない支払い</small></span></button>';
-  h += '<h2>dカードの明細</h2>';
-  h += '<label class="drop"><b>📥 明細のCSVを選ぶ</b><span class="muted">dカードのサイトからダウンロードしたファイル</span><input type="file" accept=".csv,text/csv" onchange="pickFile(this)"></label>';
-  h += '<div class="card" style="margin-top:12px"><b>やりかた</b><ol class="steps"><li>dカードのサイトかアプリにログイン</li><li>「ご利用明細」で月を選んで <b>CSVダウンロード</b></li><li>上のボタンからそのファイルを選ぶ</li><li>「振り分け」で要確認の分だけタップ</li></ol>';
-  h += '<p class="muted" style="margin-bottom:0">同じファイルを2回入れても、取り込み済みの明細は自動で飛ばすから大丈夫。</p></div>';
+  // 2026-11-18 文字へらし：ボタン3つと、最近の取り込みだけ
+  h += '<button class="chebtn" onclick="openChe()"><span class="ic2">📷</span><span>ちぇちゃんが払った分</span></button>';
+  h += '<button class="chebtn" onclick="openCash()"><span class="ic2">💴</span><span>現金で払った分</span></button>';
+  h += '<label class="drop" style="margin-top:4px"><b>📥 dカードのCSVを選ぶ</b><input type="file" accept=".csv,text/csv" onchange="pickFile(this)"></label>';
   h += '<h2>最近の取り込み</h2>';
   if (!S.log) { call('getImportLog').then(function (l) { S.log = l; if (S.tab === 'imp') render(); }).catch(fail); return h + '<div class="list"><div class="empty">…</div></div>'; }
   h += '<div class="list">' + (S.log.length ? S.log.map(function (l) {
