@@ -101,6 +101,9 @@ nav button.on .ic { filter: none; opacity: 1; }
 .item .t { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item .s { color: var(--sub); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item .a { font-weight: 700; white-space: nowrap; }
+.dayhd { display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); margin: 14px 6px 4px; font-weight: 700; }
+.dayhd:first-of-type { margin-top: 4px; }
+.mk { letter-spacing: 1px; }
 .tag { font-size: 11px; padding: 0 6px; border-radius: 6px; background: var(--warn-bg); color: var(--warn); margin-left: 4px; }
 .empty { text-align: center; color: var(--sub); padding: 28px; }
 
@@ -254,7 +257,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=0bd56d2c'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=94e3b708'); });
 </script>
 </head>
 <body>
@@ -414,17 +417,39 @@ function viewList() {
   h += '<div id="listbody">' + listBody(txs, total) + '</div>';
   return h;
 }
+/** 一覧用に店名を読みやすく：全角英数→半角、「ｄ払いＢ／」「／ＮＦＣ」などを外す（元の名前は明細を開けば見える） */
+function niceName(t) {
+  if (t.shown) return { name: t.shown, dpay: false };
+  var n = String(t.name || '').replace(/[！-～]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/　/g, ' ');
+  var dp = /^d払いB(\/|$)/i.test(n);
+  n = n.replace(/^d払いB\/?/i, '').replace(/\/(NFC|iD|ID)$/i, '').replace(/\/$/, '').replace(/\s{2,}/g, ' ').trim();
+  return { name: n || 'd払い', dpay: dp };
+}
 function listBody(txs, total) {
+  // 2026-11-18 スッキリ版（本人：情報が多くて見にくい）：日付ごとにまとめて、1件は「名前・金額」と「カテゴリ」だけ。印は小さいアイコンに
   if (!txs.length) return '<div class="list"><div class="empty">該当する明細はないよ</div></div>';
-  var h = '<div class="row muted" style="margin:0 4px 6px"><span>' + txs.length + '件</span><span class="num">合計 <b style="color:var(--ink)">' + yen(total) + '</b></span></div><div class="list">';
-  txs.forEach(function (t) {
-    var w = whoOf(t.who), need = t.status !== '確定' || !t.who;
-    var che = t.payer === 'ちぇちゃん';
-    h += '<div class="item" onclick="' + (che ? 'openChe' : 'openEdit') + '(\'' + esc(t.id) + '\')"><span class="dot ' + (need ? 'none' : w.cls) + '"></span><div class="mid"><div class="t">' + esc(title(t)) + (need ? '<span class="tag">要確認</span>' : '') + (che ? '<span class="tag che">ちぇ払い</span>' : '') + (t.source === 'dカード速報' ? '<span class="tag" style="background:var(--soft);color:var(--accent)">⚡速報</span>' : '') + (t.noBudget ? '<span class="tag" style="background:var(--soft);color:var(--sub)">予算外</span>' : '') + '</div>';
-    h += '<div class="s"><span style="color:var(--e' + t.enemyEff + ');font-weight:700">' + '①②③④'.charAt(t.enemyEff - 1) + '</span> ' + md(t.date) + ' ・ ' + esc(t.category || 'その他') + (t.memo ? ' ・ 📝' + esc(t.memo) : '') + (t.shown ? ' ・ ' + esc(t.name) : '') + '</div></div>';
-    h += '<div class="a num">' + yen(t.amount) + '</div></div>';
+  var h = '<div class="row muted" style="margin:0 4px 6px"><span>' + txs.length + '件</span><span class="num">合計 <b style="color:var(--ink)">' + yen(total) + '</b></span></div>';
+  var byDate = {}, dates = [];
+  txs.forEach(function (t) { var d = t.date || '日付なし'; if (!byDate[d]) { byDate[d] = []; dates.push(d); } byDate[d].push(t); });
+  dates.sort(function (x, y) { return x < y ? 1 : x > y ? -1 : 0; }); // 新しい日が上
+  var WD = '日月火水木金土';
+  dates.forEach(function (d) {
+    var m = String(d).match(/^(\d{4})\/(\d{2})\/(\d{2})$/), lab = m ? (+m[2]) + '/' + (+m[3]) + '（' + WD.charAt(new Date(+m[1], +m[2] - 1, +m[3]).getDay()) + '）' : d;
+    var dayTotal = byDate[d].reduce(function (a, t) { return a + t.amount; }, 0);
+    h += '<div class="dayhd"><span>' + lab + '</span><span class="num">' + yen(dayTotal) + '</span></div><div class="list">';
+    byDate[d].forEach(function (t) {
+      var w = whoOf(t.who), need = t.status !== '確定' || !t.who, che = t.payer === 'ちぇちゃん';
+      var marks = (t.source === 'dカード速報' ? '⚡' : '') + (che ? '💙' : '') + (t.source === '現金' ? '💴' : '') + (t.memo ? '📝' : '') + (t.noBudget ? '🚫' : '');
+      h += '<div class="item" onclick="' + (che ? 'openChe' : 'openEdit') + '(\'' + esc(t.id) + '\')"><span class="dot ' + (need ? 'none' : w.cls) + '"></span><div class="mid">';
+      var nn = niceName(t);
+      h += '<div class="t">' + esc(nn.name) + (need ? '<span class="tag">要確認</span>' : '') + '</div>';
+      h += '<div class="s">' + esc(t.category || 'その他') + (nn.dpay ? '・d払い' : '') + (marks ? ' <span class="mk">' + marks + '</span>' : '') + '</div></div>';
+      h += '<div class="a num">' + yen(t.amount) + '</div></div>';
+    });
+    h += '</div>';
   });
-  return h + '</div>';
+  h += '<div class="muted" style="font-size:11px;margin:8px 4px">⚡速報　💙ちぇちゃんが払った　💴現金　📝メモあり　🚫予算に入れない　｜　左の色：<span style="color:var(--oie)">■</span>お家 <span style="color:var(--che)">■</span>ちぇ <span style="color:var(--wata)">■</span>わた</div>';
+  return h;
 }
 function renderListOnly() {
   var v = viewList(); var tmp = document.createElement('div'); tmp.innerHTML = v;
