@@ -215,6 +215,13 @@ ol.steps li { margin: 3px 0; }
 .loading { text-align: center; padding: 60px 0; color: var(--sub); }
 .spin { display: inline-block; width: 22px; height: 22px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.8s linear infinite; }
 @keyframes sp { to { transform: rotate(360deg); } }
+.helpbtn { border: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--soft); color: var(--sub); font-size: 13px; font-weight: 700; cursor: pointer; vertical-align: middle; margin-left: 2px; }
+.guide h3 { font-size: 15px; margin: 18px 0 6px; }
+.guide p, .guide li { font-size: 14px; line-height: 1.7; }
+.guide ol, .guide ul { padding-left: 1.3em; margin: 4px 0; }
+.guide details { background: var(--bg); border-radius: 12px; padding: 8px 12px; margin: 8px 0; }
+.guide summary { font-weight: 700; cursor: pointer; }
+.guide .ex { background: var(--soft); border-radius: 10px; padding: 8px 10px; font-size: 13px; }
 .stale #mlabel::after { content: ' ⟳'; opacity: .45; font-weight: 400; }
 </style>
 <link rel="manifest" href="manifest.webmanifest">
@@ -241,13 +248,13 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=0d70893c'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=34d6a26e'); });
 </script>
 </head>
 <body>
 <header>
   <div class="top">
-    <div class="brand"><span id="eto">🐴</span> わかけいぼ</div>
+    <div class="brand"><span id="eto">🐴</span> わかけいぼ <button class="helpbtn" id="help" aria-label="使い方" onclick="openGuide()">？</button></div>
     <div class="month">
       <button class="iconbtn" id="prev" aria-label="前の月">‹</button>
       <b id="mlabel">…</b>
@@ -586,6 +593,45 @@ function nwCard(m) {
   if (!n.invest) h += '<div class="muted" style="font-size:11px;margin-top:4px">NISA・企業型DCの残高を「＋ 口座を追加」（種類：投資）で入れると、増やすに入るよ</div>';
   h += '<div class="muted" style="font-size:11px;margin-top:2px">守る＋増やす−借金。借金がへっても、貯金がふえても、ここがふえるよ</div>';
   return h + '</div>';
+}
+/* ---------- 使い方ガイド（2026-11-18：初めて見る人でもわかるように） ---------- */
+function openGuide() {
+  var che = S.role === 'che', h = '<div class="grab"></div><div class="guide"><b style="font-size:18px">📖 わかけいぼの使い方</b>';
+  if (che) {
+    h += '<p>わたちゃんとちぇちゃん、ふたりの家計簿だよ。ちぇちゃんの画面は、<b>お家の分</b>と<b>ちぇちゃんの分</b>だけが見えるようになってる。わたちゃん個人の買い物は見えないよ。</p>';
+    h += '<h3>下のボタン（3つ）</h3>';
+    h += '<details open><summary>📊 今月の家計</summary><p>今月、<b>お家で使ったお金</b>と<b>自分で使ったお金</b>。先月よりふえたか・へったか、何に使ったかがわかるよ。</p></details>';
+    h += '<details><summary>💙 今月の精算</summary><p>今月、<b>わたちゃんに払う金額</b>。家賃や生活費の半分＋ちぇちゃん個人の分から、立て替えてくれた分を引いた金額だよ。払う日は上に出てる「◯/10 払い」の日。</p></details>';
+    h += '<details><summary>📷 払った分</summary><p>ちぇちゃんがお家の物を<b>自分のお金で買ったとき</b>に入れるところ。</p><ol><li>「立て替えた分を入れる」を押す</li><li>📷でレシートを撮ると、日付・お店・金額をAIが読んでくれる（入ったら必ず確認してね）</li><li>「保存」</li></ol><p>半分はわたちゃんが払うことになって、次の精算で引かれるよ。</p></details>';
+  } else {
+    h += '<p>ふたりの家計簿。カードの明細を<b>お家（半分ずつ）・ちぇちゃん・わたちゃん</b>に分けて、ちぇちゃんに払ってもらう金額を出すよ。データはわたちゃんのGoogleスプレッドシートに入ってる。</p>';
+    h += '<h3>毎月やること</h3><ol>';
+    h += '<li><b>カードを使う</b> → iPhoneに速報が来て、アプリに自動で入る（⚡速報）</li>';
+    h += '<li><b>振り分け</b>：だれの分かをタップ（覚えているうちに）</li>';
+    h += '<li><b>月に1回</b>：dカードのサイトでCSVをダウンロード →「取り込み」で入れる（速報は本物の明細に置きかわる）</li>';
+    h += '<li><b>まとめ</b>を見て、ちぇちゃんに「📤 今月のまとめを送る」</li>';
+    h += '<li><b>給料日のあと</b>：貯金・NISA・貸してるお金の残高を入れ直す（純資産の棚卸し）</li></ol>';
+    h += '<h3>下のボタン（5つ）</h3>';
+    h += '<details><summary>🗂️ 振り分け</summary><p>まだ「だれの分か」決まってない明細が出る。<b>お家・ちぇ・わた</b>をタップするだけ。「たぶんこれ」は過去の同じお店からの予想だよ。</p></details>';
+    h += '<details><summary>🧾 明細</summary><p>その月の明細ぜんぶ。タップすると、名前・メモ・カテゴリ・だれの分かを直せる。「この店はいつも〜」にチェックすると、次から自動になる。</p></details>';
+    h += '<details><summary>👾 予算</summary><p>カテゴリごとの予算と、今どれだけ使ったか。<b>4つの敵</b>に分けてあるよ（下の「言葉」を見てね）。</p></details>';
+    h += '<details><summary>📊 まとめ</summary><p>上から順に：今月の家計の合計 → ちぇちゃんからもらう金額 → 💗自分の明細（目標まであと少し？） → 🐷貯金 → 💎純資産 → グラフ。▸ を押すと、くわしい計算が開くよ。</p></details>';
+    h += '<details><summary>📥 取り込み</summary><p>dカードのCSVを入れるところ。ほかに、<b>ちぇちゃんが払った分</b>と<b>現金で払った分</b>（美容院など）もここから入れる。</p></details>';
+  }
+  h += '<h3>言葉のいみ</h3>';
+  h += '<details><summary>🏠 お家・💙 ちぇ・💗 わた</summary><p><b>お家</b>＝ふたりの生活の物（食べ物・日用品・家賃など）。<b>半分ずつ</b>払う。<br><b>ちぇ／わた</b>＝それぞれ個人の物。その人が全部払う。</p></details>';
+  h += '<details><summary>📅 「◯月分」ってどこからどこまで？</summary><p>dカードに合わせて、<b>16日〜次の月の15日</b>で1か月。例：12月分＝11/16〜12/15に使った分。25日に金額が決まって、次の月の10日に払うよ。</p></details>';
+  if (!che) {
+    h += '<details><summary>👾 4つの敵</summary><ul><li><b>① 毎月の固定費</b>：家賃・通信費など。毎月同じ</li><li><b>② 毎月の変動費</b>：食費・外食・日用品など。月の予算で見る</li><li><b>③ 不定期の固定費</b>：年会費など。年の予算</li><li><b>④ 不定期の変動費</b>：家電・旅行・服など。年の予算</li></ul></details>';
+    h += '<details><summary>⚡ 速報</summary><p>カードやd払いを使った瞬間に届くメッセージから入れた明細。お店が「Mastercard加盟店」になることもあるので、覚えているうちに振り分けてね。月末にCSVを入れると本物に置きかわる。</p></details>';
+    h += '<details><summary>💎 純資産・🛟 生活防衛資金</summary><p><b>純資産</b>＝貯金＋投資＋貸してるお金−借金。<b>先月よりふえたか</b>だけ見ればOK。<br><b>生活防衛資金</b>＝急に働けなくなっても暮らせる現金。目安は生活費の6か月分。</p></details>';
+  }
+  h += '<h3>こまったとき</h3><ul>';
+  h += '<li>月の名前の横に <b>⟳</b> が出てる → 最新を読み込み中。少し待つと消えるよ</li>';
+  h += '<li>「専用のリンクから開いてね」と出る → わたちゃんからもらったリンクから開き直す</li>';
+  h += '<li>数字がおかしい・わからない → わたちゃんに聞いてね</li></ul>';
+  h += '<div class="btns"><button class="btn primary" onclick="closeSheet()">とじる</button></div></div>';
+  openSheet(h);
 }
 function syen(x) { return (x < 0 ? '−' : '') + yen(Math.abs(x)); }
 function pct(r) { return r === null || r === undefined ? '−' : Math.round(r * 100) + '%'; }
