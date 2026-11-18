@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>わかけいぼ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
@@ -31,6 +31,11 @@
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }
+/* 左右にブレないように（2026-11-18 本人の希望：上下のスクロールだけ） */
+html, body { overflow-x: clip; max-width: 100%; overscroll-behavior-x: none; touch-action: pan-y; }
+.chips { touch-action: pan-x pan-y; }
+/* iPhoneは16px未満の入力欄を触ると画面が拡大されて左右にずれるので、入力欄は16px */
+input, select, textarea { font-size: 16px !important; }
 body { font-family: "Zen Maru Gothic", -apple-system, "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif; font-size: 15px; line-height: 1.5;
   padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -216,12 +221,13 @@ ol.steps li { margin: 3px 0; }
 .spin { display: inline-block; width: 22px; height: 22px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.8s linear infinite; }
 @keyframes sp { to { transform: rotate(360deg); } }
 .helpbtn { border: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--soft); color: var(--sub); font-size: 13px; font-weight: 700; cursor: pointer; vertical-align: middle; margin-left: 2px; }
-.guide h3 { font-size: 15px; margin: 18px 0 6px; }
-.guide p, .guide li { font-size: 14px; line-height: 1.7; }
-.guide ol, .guide ul { padding-left: 1.3em; margin: 4px 0; }
-.guide details { background: var(--bg); border-radius: 12px; padding: 8px 12px; margin: 8px 0; }
-.guide summary { font-weight: 700; cursor: pointer; }
-.guide .ex { background: var(--soft); border-radius: 10px; padding: 8px 10px; font-size: 13px; }
+.guide .gtitle { font-size: 20px; font-weight: 700; margin: 2px 0 6px; }
+.guide .gsec { font-size: 13px; font-weight: 700; color: var(--accent); margin: 18px 2px 8px; }
+.guide .gstep, .guide .grow { display: flex; gap: 12px; align-items: center; background: var(--bg); border-radius: 14px; padding: 10px 12px; margin-bottom: 6px; }
+.guide .gnum { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700; display: grid; place-items: center; font-size: 15px; }
+.guide .gic { flex: none; width: 28px; text-align: center; font-size: 20px; }
+.guide .gt { font-size: 15px; font-weight: 700; line-height: 1.4; }
+.guide .gs { font-size: 13px; color: var(--sub); line-height: 1.5; }
 .stale #mlabel::after { content: ' ⟳'; opacity: .45; font-weight: 400; }
 </style>
 <link rel="manifest" href="manifest.webmanifest">
@@ -248,7 +254,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=34d6a26e'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=0bd56d2c'); });
 </script>
 </head>
 <body>
@@ -555,7 +561,7 @@ function goalCard(m) {
     '<span class="num"><b style="font-size:18px;color:' + col + '">' + yen(p.used) + '</b><span class="muted"> ／ ' + yen(p.goal) + '</span></span></div>';
   // 使った割合と、日にちの進み（▲）
   h += '<div style="position:relative;height:12px;border-radius:6px;background:var(--line);overflow:hidden;margin:8px 0 4px"><div style="width:' + Math.round(r * 100) + '%;height:100%;background:' + col + '"></div></div>';
-  if (!p.finished) h += '<div style="position:relative;height:8px;margin-top:-4px"><span style="position:absolute;left:calc(' + Math.round(pr * 100) + '% - 5px);font-size:9px;color:var(--sub)">▲</span></div>';
+  if (!p.finished) h += '<div style="position:relative;height:8px;margin-top:-4px"><span style="position:absolute;left:calc(' + Math.min(97, Math.max(1, Math.round(pr * 100))) + '% - 5px);font-size:9px;color:var(--sub)">▲</span></div>';
   if (over) h += '<div class="num" style="font-size:13px;color:var(--wata)"><b>' + yen(-p.left) + ' オーバー</b></div>';
   else if (p.finished) h += '<div class="num" style="font-size:13px;color:var(--oie)"><b>' + yen(p.left) + ' 残せた👏</b></div>';
   else h += '<div class="num" style="font-size:13px">あと <b>' + yen(p.left) + '</b>（あと' + p.daysLeft + '日・1日 <b>' + yen(p.perDay) + '</b> まで）</div>';
@@ -596,40 +602,45 @@ function nwCard(m) {
 }
 /* ---------- 使い方ガイド（2026-11-18：初めて見る人でもわかるように） ---------- */
 function openGuide() {
-  var che = S.role === 'che', h = '<div class="grab"></div><div class="guide"><b style="font-size:18px">📖 わかけいぼの使い方</b>';
+  // 2026-11-18 作り直し（本人：見にくい）：文を短く、手順は番号つきカード、ボタンと言葉は1行ずつ
+  var che = S.role === 'che';
+  var step = function (n, ic, t, sub) { return '<div class="gstep"><div class="gnum">' + n + '</div><div><div class="gt">' + ic + ' ' + t + '</div><div class="gs">' + sub + '</div></div></div>'; };
+  var row = function (ic, t, sub) { return '<div class="grow"><div class="gic">' + ic + '</div><div><div class="gt">' + t + '</div><div class="gs">' + sub + '</div></div></div>'; };
+  var h = '<div class="grab"></div><div class="guide"><div class="gtitle">📖 使い方</div>';
   if (che) {
-    h += '<p>わたちゃんとちぇちゃん、ふたりの家計簿だよ。ちぇちゃんの画面は、<b>お家の分</b>と<b>ちぇちゃんの分</b>だけが見えるようになってる。わたちゃん個人の買い物は見えないよ。</p>';
-    h += '<h3>下のボタン（3つ）</h3>';
-    h += '<details open><summary>📊 今月の家計</summary><p>今月、<b>お家で使ったお金</b>と<b>自分で使ったお金</b>。先月よりふえたか・へったか、何に使ったかがわかるよ。</p></details>';
-    h += '<details><summary>💙 今月の精算</summary><p>今月、<b>わたちゃんに払う金額</b>。家賃や生活費の半分＋ちぇちゃん個人の分から、立て替えてくれた分を引いた金額だよ。払う日は上に出てる「◯/10 払い」の日。</p></details>';
-    h += '<details><summary>📷 払った分</summary><p>ちぇちゃんがお家の物を<b>自分のお金で買ったとき</b>に入れるところ。</p><ol><li>「立て替えた分を入れる」を押す</li><li>📷でレシートを撮ると、日付・お店・金額をAIが読んでくれる（入ったら必ず確認してね）</li><li>「保存」</li></ol><p>半分はわたちゃんが払うことになって、次の精算で引かれるよ。</p></details>';
+    h += '<div class="gsec">ちぇちゃんがやること</div>';
+    h += step(1, '📷', 'お家の物を買ったら入れる', '「払った分」→ レシートを撮る → 保存');
+    h += step(2, '💙', '払う金額を見る', '「今月の精算」の金額を、10日までに');
+    h += '<div class="gsec">下のボタン</div>';
+    h += row('📊', '今月の家計', 'お家と自分で、いくら使ったか');
+    h += row('💙', '今月の精算', 'わたちゃんに払う金額');
+    h += row('📷', '払った分', 'お家の物を立て替えたら、ここに入れる（半分はわたちゃん持ち）');
   } else {
-    h += '<p>ふたりの家計簿。カードの明細を<b>お家（半分ずつ）・ちぇちゃん・わたちゃん</b>に分けて、ちぇちゃんに払ってもらう金額を出すよ。データはわたちゃんのGoogleスプレッドシートに入ってる。</p>';
-    h += '<h3>毎月やること</h3><ol>';
-    h += '<li><b>カードを使う</b> → iPhoneに速報が来て、アプリに自動で入る（⚡速報）</li>';
-    h += '<li><b>振り分け</b>：だれの分かをタップ（覚えているうちに）</li>';
-    h += '<li><b>月に1回</b>：dカードのサイトでCSVをダウンロード →「取り込み」で入れる（速報は本物の明細に置きかわる）</li>';
-    h += '<li><b>まとめ</b>を見て、ちぇちゃんに「📤 今月のまとめを送る」</li>';
-    h += '<li><b>給料日のあと</b>：貯金・NISA・貸してるお金の残高を入れ直す（純資産の棚卸し）</li></ol>';
-    h += '<h3>下のボタン（5つ）</h3>';
-    h += '<details><summary>🗂️ 振り分け</summary><p>まだ「だれの分か」決まってない明細が出る。<b>お家・ちぇ・わた</b>をタップするだけ。「たぶんこれ」は過去の同じお店からの予想だよ。</p></details>';
-    h += '<details><summary>🧾 明細</summary><p>その月の明細ぜんぶ。タップすると、名前・メモ・カテゴリ・だれの分かを直せる。「この店はいつも〜」にチェックすると、次から自動になる。</p></details>';
-    h += '<details><summary>👾 予算</summary><p>カテゴリごとの予算と、今どれだけ使ったか。<b>4つの敵</b>に分けてあるよ（下の「言葉」を見てね）。</p></details>';
-    h += '<details><summary>📊 まとめ</summary><p>上から順に：今月の家計の合計 → ちぇちゃんからもらう金額 → 💗自分の明細（目標まであと少し？） → 🐷貯金 → 💎純資産 → グラフ。▸ を押すと、くわしい計算が開くよ。</p></details>';
-    h += '<details><summary>📥 取り込み</summary><p>dカードのCSVを入れるところ。ほかに、<b>ちぇちゃんが払った分</b>と<b>現金で払った分</b>（美容院など）もここから入れる。</p></details>';
+    h += '<div class="gsec">毎月やること</div>';
+    h += step(1, '💳', 'カードを使う', 'iPhoneに速報が来て、自動で入る');
+    h += step(2, '🗂️', '振り分ける', 'お家・ちぇ・わたをタップ');
+    h += step(3, '📥', '月1回、CSVを入れる', 'dカードのサイト → 取り込み');
+    h += step(4, '📤', 'ちぇちゃんに送る', 'まとめ →「今月のまとめを送る」');
+    h += step(5, '🛟', '給料日のあと、残高を入れる', '貯金・NISA・貸してるお金');
+    h += '<div class="gsec">下のボタン</div>';
+    h += row('🗂️', '振り分け', 'だれの分か、まだ決まってない明細');
+    h += row('🧾', '明細', 'タップで名前・メモ・カテゴリを直せる');
+    h += row('👾', '予算', 'カテゴリごとに、あといくら使えるか');
+    h += row('📊', 'まとめ', '精算・自分の明細・貯金・純資産');
+    h += row('📥', '取り込み', 'CSV・ちぇちゃんが払った分・現金');
   }
-  h += '<h3>言葉のいみ</h3>';
-  h += '<details><summary>🏠 お家・💙 ちぇ・💗 わた</summary><p><b>お家</b>＝ふたりの生活の物（食べ物・日用品・家賃など）。<b>半分ずつ</b>払う。<br><b>ちぇ／わた</b>＝それぞれ個人の物。その人が全部払う。</p></details>';
-  h += '<details><summary>📅 「◯月分」ってどこからどこまで？</summary><p>dカードに合わせて、<b>16日〜次の月の15日</b>で1か月。例：12月分＝11/16〜12/15に使った分。25日に金額が決まって、次の月の10日に払うよ。</p></details>';
+  h += '<div class="gsec">言葉</div>';
+  h += row('🏠', 'お家', 'ふたりの物。半分ずつ払う');
+  h += row('📅', '◯月分', '16日〜次の月の15日に使った分');
   if (!che) {
-    h += '<details><summary>👾 4つの敵</summary><ul><li><b>① 毎月の固定費</b>：家賃・通信費など。毎月同じ</li><li><b>② 毎月の変動費</b>：食費・外食・日用品など。月の予算で見る</li><li><b>③ 不定期の固定費</b>：年会費など。年の予算</li><li><b>④ 不定期の変動費</b>：家電・旅行・服など。年の予算</li></ul></details>';
-    h += '<details><summary>⚡ 速報</summary><p>カードやd払いを使った瞬間に届くメッセージから入れた明細。お店が「Mastercard加盟店」になることもあるので、覚えているうちに振り分けてね。月末にCSVを入れると本物に置きかわる。</p></details>';
-    h += '<details><summary>💎 純資産・🛟 生活防衛資金</summary><p><b>純資産</b>＝貯金＋投資＋貸してるお金−借金。<b>先月よりふえたか</b>だけ見ればOK。<br><b>生活防衛資金</b>＝急に働けなくなっても暮らせる現金。目安は生活費の6か月分。</p></details>';
+    h += row('⚡', '速報', '使ってすぐ入った明細。月末に本物に置きかわる');
+    h += row('👾', '4つの敵', '①毎月の固定費 ②毎月の変動費 ③不定期の固定費 ④不定期の変動費');
+    h += row('💎', '純資産', '貯金＋投資＋貸してる−借金。ふえてたらOK');
+    h += row('🛟', '生活防衛資金', 'すぐ使える現金。目安は生活費の6か月分');
   }
-  h += '<h3>こまったとき</h3><ul>';
-  h += '<li>月の名前の横に <b>⟳</b> が出てる → 最新を読み込み中。少し待つと消えるよ</li>';
-  h += '<li>「専用のリンクから開いてね」と出る → わたちゃんからもらったリンクから開き直す</li>';
-  h += '<li>数字がおかしい・わからない → わたちゃんに聞いてね</li></ul>';
+  h += '<div class="gsec">こまったら</div>';
+  h += row('⟳', '月の横に⟳', '最新を読み込み中。少し待ってね');
+  h += row('🔑', '「専用のリンクから」と出る', 'もらったリンクから開き直す');
   h += '<div class="btns"><button class="btn primary" onclick="closeSheet()">とじる</button></div></div>';
   openSheet(h);
 }
