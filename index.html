@@ -240,7 +240,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=c7628f99'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=0767291b'); });
 </script>
 </head>
 <body>
@@ -543,11 +543,57 @@ function saveCard(m) {
     '<b class="num" style="font-size:20px;color:' + (neg ? 'var(--wata)' : 'var(--oie)') + '">' + (neg ? '−' : '＋') + yen(Math.abs(v.real)) + '</b></div>' +
     '<div class="muted num" style="font-size:12px;margin-top:2px">収入 ' + yen(v.income) + ' − 自分で持つ金額 ' + yen(v.spend) + '・貯蓄率 ' + pct(v.rate) + '</div>' +
     (v.pre ? '<div class="num" style="font-size:12px;margin-top:6px">先取りした額 ' + yen(v.pre) + (v.short ? '　<span style="color:var(--wata)">→ うち ' + yen(Math.min(v.short, v.pre)) + ' は貯金から戻す計算' + (v.short > v.pre ? '、さらに ' + yen(v.short - v.pre) + ' 足りない' : '') + '</span>' : '　<span style="color:var(--oie)">→ 守れてる👏</span>') + '</div>' : '') +
-    '</div>';
+    defLine(m) + '</div>';
+}
+function defLine(m) {
+  var d = m.defense;
+  if (!d) return '';
+  if (!(m.accounts || []).length) return '<div style="font-size:12px;margin-top:6px;color:var(--accent)">🛟 貯金の残高を入れると、生活防衛資金が何か月分あるか出るよ →</div>';
+  return '<div class="num" style="font-size:12px;margin-top:6px">🛟 生活防衛資金 <b>' + (d.covered === null ? '−' : d.covered.toFixed(1)) + 'か月分</b>（目安 ' + d.months + 'か月分）</div>';
+}
+function defBody(m) {
+  var d = m.defense, acc = m.accounts || [];
+  var b = '<div style="font-size:13px;margin-bottom:6px"><b>🛟 生活防衛資金</b> <span class="muted">急な出費や収入がへったときのための現金</span></div>';
+  if (acc.length && d.monthly) {
+    var r = Math.min(1, d.cash / (d.target || 1));
+    b += '<div class="num" style="display:flex;justify-content:space-between;align-items:baseline"><span>現金の貯金 <b style="font-size:18px">' + yen(d.cash) + '</b></span><span class="muted">目標 ' + yen(d.target) + '</span></div>' +
+      '<div style="height:12px;border-radius:6px;background:var(--line);overflow:hidden;margin:6px 0"><div style="width:' + Math.round(r * 100) + '%;height:100%;background:' + (r >= 1 ? 'var(--oie)' : 'var(--accent)') + '"></div></div>' +
+      '<div class="num" style="font-size:13px">いま <b>' + d.covered.toFixed(1) + 'か月分</b>' + (d.gap ? '・目標まであと <b>' + yen(d.gap) + '</b>' : '・<b style="color:var(--oie)">目標クリア👏</b>') + '</div>' +
+      '<p class="muted" style="font-size:11px;margin:4px 0 8px">1か月の生活費 ' + yen(d.monthly) + '（直近' + d.basedOn + 'か月の「自分で持つ金額」の真ん中の値）× ' + d.months + 'か月。会社員の目安は6か月分</p>';
+  }
+  b += '<table class="calc num" style="font-size:13px">';
+  acc.forEach(function (a, i) {
+    b += '<tr onclick="openAccount(' + i + ')" style="cursor:pointer"><td style="text-align:left">' + esc(a.name) + '<br><span class="muted">' + (a.kind === '投資' ? '投資（生活防衛資金には入れない）' : '現金') + '・' + md(a.base) + 'に入れた残高</span></td><td>' + yen(a.balance) + ' ✏️</td></tr>';
+  });
+  b += '<tr onclick="openAccount(-1)" style="cursor:pointer"><td style="text-align:left" class="muted">＋ 口座を追加（貯金・NISAなど）</td><td></td></tr></table>';
+  return b + '<div style="height:1px;background:var(--line);margin:14px 0"></div>';
+}
+function openAccount(i) {
+  var a = i >= 0 ? S.m.accounts[i] : { row: 0, name: '', balance: '', kind: '現金', memo: '' };
+  E = { acc: a };
+  var h = '<div class="grab"></div><b style="font-size:17px">' + (a.row ? esc(a.name) : '口座を追加') + '</b>';
+  h += '<label class="f">名前</label><input class="in" id="a-name" value="' + esc(a.name) + '" placeholder="例：三菱UFJ（貯金）">';
+  h += '<label class="f">今の残高</label><input class="in num" id="a-bal" type="number" inputmode="numeric" value="' + a.balance + '">';
+  h += '<div class="muted" style="font-size:11px;margin-top:4px">入れ直すと、今日の残高になるよ。ときどき通帳やアプリを見て直してね</div>';
+  h += '<label class="f">種類</label><select class="in" id="a-kind"><option' + (a.kind !== '投資' ? ' selected' : '') + '>現金</option><option' + (a.kind === '投資' ? ' selected' : '') + '>投資</option></select>';
+  h += '<div class="btns">' + (a.row ? '<button class="btn" style="flex:.6;color:var(--wata)" onclick="saveAccountEdit(true)">消す</button>' : '') + '<button class="btn" onclick="closeSheet()">やめる</button><button class="btn primary" id="a-save" onclick="saveAccountEdit()">保存</button></div>';
+  openSheet(h);
+}
+function saveAccountEdit(remove) {
+  var a = E.acc, patch = remove ? { remove: true } : { name: $('a-name').value.trim(), kind: $('a-kind').value };
+  if (!remove) {
+    if (!patch.name) return toast('名前を入れてね');
+    var bal = $('a-bal').value.trim();
+    if (bal === '' || !(Number(bal) >= 0)) return toast('残高を入れてね');
+    if (Number(bal) !== a.balance) patch.balance = Number(bal);
+  }
+  $('a-save').disabled = true; S.openFold = 'fold-save';
+  call('saveAccount', a.row, patch).then(function () { return call('getMonth', S.period); })
+    .then(function (m) { closeSheet(); setMonth(m); toast(remove ? '消したよ' : '保存したよ'); }).catch(function (e) { $('a-save').disabled = false; fail(e); });
 }
 function saveBody(m) {
   var v = m.savings, row = function (op, label, x, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="op">' + op + '</td><td>' + label + '</td><td>' + yen(x) + '</td></tr>'; };
-  var b = '<table class="calc num">' + row('', '収入', v.income) + row('−', '自分で持つ金額<br><span class="muted">半分の生活費・自分の明細・固定費</span>', v.spend) +
+  var b = defBody(m) + '<table class="calc num">' + row('', '収入', v.income) + row('−', '自分で持つ金額<br><span class="muted">半分の生活費・自分の明細・固定費</span>', v.spend) +
     '<tr class="tot"><td class="op">＝</td><td><b>ほんとうに' + (v.real < 0 ? 'へった' : '増えた') + '貯金</b><br><span class="muted">貯蓄率 ' + pct(v.rate) + '（よく言われる目安は手取りの20%）</span></td><td style="color:' + (v.real < 0 ? 'var(--wata)' : 'var(--oie)') + '">' + syen(v.real) + '</td></tr></table>';
   b += '<div style="margin:14px 0 4px;font-size:13px"><b>先取りした分</b></div><table class="calc num" style="font-size:13px">';
   v.items.forEach(function (i) { b += '<tr><td style="text-align:left">' + esc(i.name) + (i.company ? '<br><span class="muted">会社の分なので、上の計算とは別</span>' : '') + '</td><td>' + yen(i.amount) + '</td></tr>'; });
