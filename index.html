@@ -240,7 +240,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=ceff5c6b'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=beb0435e'); });
 </script>
 </head>
 <body>
@@ -405,7 +405,7 @@ function listBody(txs, total) {
   txs.forEach(function (t) {
     var w = whoOf(t.who), need = t.status !== '確定' || !t.who;
     var che = t.payer === 'ちぇちゃん';
-    h += '<div class="item" onclick="' + (che ? 'openChe' : 'openEdit') + '(\'' + esc(t.id) + '\')"><span class="dot ' + (need ? 'none' : w.cls) + '"></span><div class="mid"><div class="t">' + esc(title(t)) + (need ? '<span class="tag">要確認</span>' : '') + (che ? '<span class="tag che">ちぇ払い</span>' : '') + (t.noBudget ? '<span class="tag" style="background:var(--soft);color:var(--sub)">予算外</span>' : '') + '</div>';
+    h += '<div class="item" onclick="' + (che ? 'openChe' : 'openEdit') + '(\'' + esc(t.id) + '\')"><span class="dot ' + (need ? 'none' : w.cls) + '"></span><div class="mid"><div class="t">' + esc(title(t)) + (need ? '<span class="tag">要確認</span>' : '') + (che ? '<span class="tag che">ちぇ払い</span>' : '') + (t.source === 'dカード速報' ? '<span class="tag" style="background:var(--soft);color:var(--accent)">⚡速報</span>' : '') + (t.noBudget ? '<span class="tag" style="background:var(--soft);color:var(--sub)">予算外</span>' : '') + '</div>';
     h += '<div class="s"><span style="color:var(--e' + t.enemyEff + ');font-weight:700">' + '①②③④'.charAt(t.enemyEff - 1) + '</span> ' + md(t.date) + ' ・ ' + esc(t.category || 'その他') + (t.memo ? ' ・ 📝' + esc(t.memo) : '') + (t.shown ? ' ・ ' + esc(t.name) : '') + '</div></div>';
     h += '<div class="a num">' + yen(t.amount) + '</div></div>';
   });
@@ -1142,7 +1142,7 @@ function commitImp() {
   $('imp-go').disabled = true; $('imp-go').textContent = '取り込み中…';
   call('commitImport', p.token, per).then(function (r) {
     S.imp = null; S.log = null; S.tab = r.review ? 'sort' : 'sum'; setMonth(r.month);
-    toast(r.added + '件取り込んだよ' + (r.review ? '・要確認' + r.review + '件' : ''));
+    toast(r.added + '件取り込んだよ' + (r.replaced ? '（速報' + r.replaced + '件を置き換え）' : '') + (r.review ? '・要確認' + r.review + '件' : ''));
   }).catch(function (e) { S.imp = null; fail(e); });
 }
 function pad(n) { return (n < 10 ? '0' : '') + n; }
