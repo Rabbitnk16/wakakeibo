@@ -241,7 +241,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=770ab91b'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=0d70893c'); });
 </script>
 </head>
 <body>
@@ -481,6 +481,7 @@ function viewSum() {
 
   h += goalCard(m);
   h += saveCard(m);
+  h += nwCard(m);
 
   var notes = [];
   if (s.undecided) notes.push('<a onclick="go(\'sort\')">🗂️ 振り分けがまだ <b>' + s.undecided + '件</b> →</a>');
@@ -567,6 +568,25 @@ function saveGoalEdit() {
   $('g-save').disabled = true;
   call('saveGoal', S.period, Number($('g-amt').value) || 0).then(function (m) { closeSheet(); setMonth(m); toast('保存したよ'); }).catch(function (e) { $('g-save').disabled = false; fail(e); });
 }
+function nwCard(m) {
+  var n = m.netWorth, hist = m.netWorthHistory || [];
+  if (!n || !(m.accounts || []).length) return '';
+  var prev = hist.filter(function (x) { return x.month < new Date().toISOString().slice(0, 7); }).slice(-1)[0];
+  var diff = prev ? n.total - prev.total : null;
+  var h = '<div class="card" onclick="openFold(\'fold-save\')" style="cursor:pointer">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>💎 わたちゃんの純資産</b><b class="num" style="font-size:20px;color:' + (n.total < 0 ? 'var(--wata)' : 'var(--oie)') + '">' + syen(n.total) + '</b></div>';
+  if (diff !== null) h += '<div class="num" style="font-size:12px;text-align:right;color:' + (diff >= 0 ? 'var(--oie)' : 'var(--wata)') + '">先月より ' + (diff >= 0 ? '＋' : '−') + yen(Math.abs(diff)) + (diff >= 0 ? ' 👍' : '') + '</div>';
+  var cell = function (ic, lb, v, col) { return '<div style="flex:1;text-align:center"><div class="muted" style="font-size:11px">' + ic + ' ' + lb + '</div><div class="num" style="font-size:13px;font-weight:700' + (col ? ';color:' + col : '') + '">' + v + '</div></div>'; };
+  h += '<div style="display:flex;gap:4px;margin-top:8px">' + cell('🛟', '守る', yen(n.cash)) + cell('🌱', '増やす', yen(n.invest)) + (n.lend ? cell('🤝', '貸してる', yen(n.lend)) : '') + cell('🔻', '借金', '−' + yen(n.debt), 'var(--wata)') + '</div>';
+  if (hist.length >= 2) {
+    var vals = hist.map(function (x) { return x.total; }), mx = Math.max.apply(null, vals), mn = Math.min.apply(null, vals), W = 300, H = 36, rg = (mx - mn) || 1;
+    var pts = hist.map(function (x, i) { return (i * W / (hist.length - 1)).toFixed(1) + ',' + (H - (x.total - mn) / rg * H).toFixed(1); }).join(' ');
+    h += '<svg viewBox="-4 -4 ' + (W + 8) + ' ' + (H + 8) + '" style="width:100%;height:44px;margin-top:6px"><polyline points="' + pts + '" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>';
+  }
+  if (!n.invest) h += '<div class="muted" style="font-size:11px;margin-top:4px">NISA・企業型DCの残高を「＋ 口座を追加」（種類：投資）で入れると、増やすに入るよ</div>';
+  h += '<div class="muted" style="font-size:11px;margin-top:2px">守る＋増やす−借金。借金がへっても、貯金がふえても、ここがふえるよ</div>';
+  return h + '</div>';
+}
 function syen(x) { return (x < 0 ? '−' : '') + yen(Math.abs(x)); }
 function pct(r) { return r === null || r === undefined ? '−' : Math.round(r * 100) + '%'; }
 function saveCard(m) {
@@ -598,7 +618,7 @@ function defBody(m) {
   }
   b += '<table class="calc num" style="font-size:13px">';
   acc.forEach(function (a, i) {
-    b += '<tr onclick="openAccount(' + i + ')" style="cursor:pointer"><td style="text-align:left">' + esc(a.name) + '<br><span class="muted">' + (a.kind === '投資' ? '投資（生活防衛資金には入れない）' : '現金') + '・' + md(a.base) + 'に入れた残高</span></td><td>' + yen(a.balance) + ' ✏️</td></tr>';
+    b += '<tr onclick="openAccount(' + i + ')" style="cursor:pointer"><td style="text-align:left">' + esc(a.name) + '<br><span class="muted">' + (a.kind === '投資' ? '投資（生活防衛資金には入れない）' : a.kind === '貸している' ? '貸している（生活防衛資金には入れない）' : '現金') + '・' + md(a.base) + 'に入れた残高</span></td><td>' + yen(a.balance) + ' ✏️</td></tr>';
   });
   b += '<tr onclick="openAccount(-1)" style="cursor:pointer"><td style="text-align:left" class="muted">＋ 口座を追加（貯金・NISAなど）</td><td></td></tr></table>';
   return b + '<div style="height:1px;background:var(--line);margin:14px 0"></div>';
@@ -610,7 +630,8 @@ function openAccount(i) {
   h += '<label class="f">名前</label><input class="in" id="a-name" value="' + esc(a.name) + '" placeholder="例：三菱UFJ（貯金）">';
   h += '<label class="f">今の残高</label><input class="in num" id="a-bal" type="number" inputmode="numeric" value="' + a.balance + '">';
   h += '<div class="muted" style="font-size:11px;margin-top:4px">入れ直すと、今日の残高になるよ。ときどき通帳やアプリを見て直してね</div>';
-  h += '<label class="f">種類</label><select class="in" id="a-kind"><option' + (a.kind !== '投資' ? ' selected' : '') + '>現金</option><option' + (a.kind === '投資' ? ' selected' : '') + '>投資</option></select>';
+  h += '<label class="f">種類</label><select class="in" id="a-kind">' + ['現金', '投資', '貸している'].map(function (k) { return '<option' + ((a.kind || '現金') === k ? ' selected' : '') + '>' + k + '</option>'; }).join('') + '</select>';
+  h += '<div class="muted" style="font-size:11px;margin-top:4px">現金＝すぐ使える貯金（生活防衛資金）、投資＝NISA・DCなど、貸している＝人に貸していて返ってくるお金</div>';
   h += '<div class="btns">' + (a.row ? '<button class="btn" style="flex:.6;color:var(--wata)" onclick="saveAccountEdit(true)">消す</button>' : '') + '<button class="btn" onclick="closeSheet()">やめる</button><button class="btn primary" id="a-save" onclick="saveAccountEdit()">保存</button></div>';
   openSheet(h);
 }
