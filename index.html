@@ -241,7 +241,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=70d2e60c'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=770ab91b'); });
 </script>
 </head>
 <body>
@@ -479,6 +479,7 @@ function viewSum() {
     '<div class="sumrow"><div><b>💙 ちぇちゃんからもらう</b><small>' + payDay + 'のカード払いの分</small></div><b class="num" style="color:var(--che)">' + yen(s.che) + '</b></div>' +
     '<div class="sumrow"><div><b>💗 わたちゃんが自分で持つ</b><small>半分の生活費＋自分の分</small></div><b class="num" style="color:var(--wata)">' + yen(s.wata) + '</b></div></div>';
 
+  h += goalCard(m);
   h += saveCard(m);
 
   var notes = [];
@@ -534,6 +535,37 @@ function viewSum() {
     h += fold('fold-loan' + li, '💳 ' + esc(l.name), isFinite(l.months) ? 'あと' + ymText(l.months) : '', loanBody(l, li), S.openFold === 'fold-loan' + li);
   });
   return h;
+}
+function goalCard(m) {
+  var p = m.personal;
+  if (!p) return '';
+  if (!p.goal) return '<div class="card" style="font-size:13px"><a onclick="openGoal()">💗 <b>自分の明細の月の目標</b>を決めると、あといくら使えるかが出るよ →</a></div>';
+  var over = p.left < 0, r = Math.min(1, p.ratio), pr = p.passed / p.days;
+  var col = over ? 'var(--wata)' : (p.ratio > pr + 0.1 && !p.finished ? 'var(--warn)' : 'var(--oie)');
+  var h = '<div class="card" onclick="openGoal()" style="cursor:pointer">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>💗 自分の明細' + (p.finished ? '（この月）' : '（今月）') + '</b>' +
+    '<span class="num"><b style="font-size:18px;color:' + col + '">' + yen(p.used) + '</b><span class="muted"> ／ ' + yen(p.goal) + '</span></span></div>';
+  // 使った割合と、日にちの進み（▲）
+  h += '<div style="position:relative;height:12px;border-radius:6px;background:var(--line);overflow:hidden;margin:8px 0 4px"><div style="width:' + Math.round(r * 100) + '%;height:100%;background:' + col + '"></div></div>';
+  if (!p.finished) h += '<div style="position:relative;height:8px;margin-top:-4px"><span style="position:absolute;left:calc(' + Math.round(pr * 100) + '% - 5px);font-size:9px;color:var(--sub)">▲</span></div>';
+  if (over) h += '<div class="num" style="font-size:13px;color:var(--wata)"><b>' + yen(-p.left) + ' オーバー</b></div>';
+  else if (p.finished) h += '<div class="num" style="font-size:13px;color:var(--oie)"><b>' + yen(p.left) + ' 残せた👏</b></div>';
+  else h += '<div class="num" style="font-size:13px">あと <b>' + yen(p.left) + '</b>（あと' + p.daysLeft + '日・1日 <b>' + yen(p.perDay) + '</b> まで）</div>';
+  if (!p.finished && p.passed >= 7) h += '<div class="muted num" style="font-size:12px;margin-top:2px">このペースだと月末 ' + yen(p.pace) + (p.pace > p.goal ? '（' + yen(p.pace - p.goal) + ' オーバーしそう）' : '') + '</div>';
+  if (p.top.length) h += '<div class="muted num" style="font-size:11px;margin-top:4px">多いもの：' + p.top.map(function (c) { return esc(c.category) + ' ' + yen(c.amount); }).join('・') + '</div>';
+  return h + '</div>';
+}
+function openGoal() {
+  var p = S.m.personal || {};
+  var h = '<div class="grab"></div><b style="font-size:17px">💗 自分の明細の月の目標</b>';
+  h += '<p class="muted" style="font-size:12px">わたちゃん個人の明細（カード・速報・現金）の合計。ちぇちゃんが立て替えた分の半分は、お家の物なので入れないよ</p>';
+  h += '<label class="f">1か月の目標</label><input class="in num" id="g-amt" type="number" inputmode="numeric" value="' + (p.goal || '') + '" placeholder="80000">';
+  h += '<div class="btns"><button class="btn" onclick="closeSheet()">やめる</button><button class="btn primary" id="g-save" onclick="saveGoalEdit()">保存</button></div>';
+  openSheet(h);
+}
+function saveGoalEdit() {
+  $('g-save').disabled = true;
+  call('saveGoal', S.period, Number($('g-amt').value) || 0).then(function (m) { closeSheet(); setMonth(m); toast('保存したよ'); }).catch(function (e) { $('g-save').disabled = false; fail(e); });
 }
 function syen(x) { return (x < 0 ? '−' : '') + yen(Math.abs(x)); }
 function pct(r) { return r === null || r === undefined ? '−' : Math.round(r * 100) + '%'; }
