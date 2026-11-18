@@ -240,7 +240,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=570812de'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=ceff5c6b'); });
 </script>
 </head>
 <body>
@@ -437,6 +437,7 @@ function openEdit(id) {
   h += '</div><p class="muted" style="margin:4px 0 0;font-size:11px">例：Amazonで買った新しいiPhone → ④。ふだんはカテゴリで自動で決まるよ</p>';
   h += '<label class="toggle"><input type="checkbox" id="e-nobud"' + (t.noBudget ? ' checked' : '') + '> 予算に入れない（ふたりの旅行じゃない、など）</label>';
   h += '<label class="f">カテゴリ</label><select class="in" id="e-cat">' + S.categories.map(function (c) { return '<option' + (c === t.category ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
+  if (t.source === '現金') h += '<button class="btn" style="width:100%;margin-top:12px" onclick="openCash(\'' + esc(t.id) + '\')">💴 日付・金額を直す／消す</button>';
   h += '<div class="orig-box">元の明細：' + esc(t.name) + '<br>' + esc(t.date) + ' ・ ' + esc(t.source) + (t.payType ? ' ・ ' + esc(t.payType) : '') + (t.reason ? ' ・ ' + esc(t.reason) : '') + '</div>';
   h += '<div class="btns"><button class="btn" onclick="closeSheet()">やめる</button><button class="btn primary" id="e-save" onclick="saveEdit()">保存</button></div>';
   openSheet(h);
@@ -790,6 +791,32 @@ function openChe(id) {
   openSheet(h); halfNote(); perOptions(per); perNote();
 }
 /** カードと同じく15日締め：16日〜翌15日を「◯月分」にする */
+function openCash(id) {
+  var t = id ? S.m.txs.filter(function (x) { return x.id === id; })[0] : null;
+  E = { cash: true, id: id || '', who: t ? t.who : 'わたちゃん' };
+  var per = t ? t.period : S.period, td = new Date(), today = td.getFullYear() + '-' + ('0' + (td.getMonth() + 1)).slice(-2) + '-' + ('0' + td.getDate()).slice(-2);
+  var h = '<div class="grab"></div><b style="font-size:17px">' + (t ? '現金で払った分を直す' : '💴 現金で払った分') + '</b>';
+  h += '<label class="f">日付</label><input class="in" id="c-date" type="date" value="' + (t ? t.date.replace(/\//g, '-') : today) + '" onchange="perFromDate()">';
+  h += '<label class="f">お店・何に使った</label><input class="in" id="c-name" value="' + esc(t ? t.name : '') + '" placeholder="例：うぱり">';
+  h += '<label class="f">金額</label><input class="in num" id="c-amt" type="number" inputmode="numeric" value="' + (t ? t.amount : '') + '" placeholder="0">';
+  h += '<label class="f">だれの</label><div class="seg" id="c-who">' + WHO.map(function (w) {
+    return '<button class="w-' + w.cls + (E.who === w.key ? ' on' : '') + '" onclick="E.who=\'' + w.key + '\';Array.prototype.forEach.call(this.parentNode.children,function(x){x.classList.remove(\'on\')});this.classList.add(\'on\')">' + w.short + '</button>';
+  }).join('') + '</div>';
+  h += '<label class="f">カテゴリ（空ならお店の名前から自動）</label><select class="in" id="c-cat"><option value="">自動で決める</option>' + S.categories.map(function (c) { return '<option' + (t && c === t.category ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
+  h += '<label class="f">メモ</label><input class="in" id="c-memo" value="' + esc(t ? t.memo : '') + '">';
+  h += '<label class="f">どの月に入れる？（日付から自動）</label><select class="in" id="c-per" onchange="E.perTouched=true;perNote()"></select><div class="muted" id="c-pernote" style="font-size:12px;margin-top:4px"></div>';
+  h += '<div class="btns">' + (t ? '<button class="btn" style="flex:.6;color:var(--wata)" onclick="delCash()">消す</button>' : '') + '<button class="btn" onclick="closeSheet()">やめる</button><button class="btn primary" id="c-save" onclick="saveCashEdit()">保存</button></div>';
+  openSheet(h); perOptions(t ? per : (periodOfDate(today) || per)); perNote();
+}
+function saveCashEdit() {
+  var e = { id: E.id, date: $('c-date').value, name: $('c-name').value, amount: $('c-amt').value, who: E.who, category: $('c-cat').value, memo: $('c-memo').value, period: $('c-per').value };
+  $('c-save').disabled = true;
+  call('saveCash', e).then(function (m) { closeSheet(); setMonth(m); toast('保存したよ（' + label(m.info.period) + '）'); }).catch(function (x) { $('c-save').disabled = false; fail(x); });
+}
+function delCash() {
+  if (!confirm('この現金の明細を消す？')) return;
+  call('deleteCash', E.id).then(function (m) { closeSheet(); setMonth(m); toast('消したよ'); }).catch(fail);
+}
 function periodOfDate(d) {
   var m = String(d).match(/^(\d{4})[\/-](\d{2})[\/-](\d{2})$/); if (!m) return '';
   return +m[3] >= 16 ? shift(m[1] + '-' + m[2], 1) : m[1] + '-' + m[2];
@@ -1087,6 +1114,7 @@ function viewImp() {
   }
   if (S.imp && S.imp.loading) return '<div class="card loading"><span class="spin"></span><div>読み込み中…</div></div>';
   h += '<h2 style="margin-top:4px">ちぇちゃんが払った分</h2>' + '<button class="chebtn" onclick="openChe()"><span class="ic2">📷</span><span>ちぇちゃんが払った分を入れる<small>d払い・現金で払ったお家の物。半分はわたちゃん負担になるよ</small></span></button>';
+  h += '<h2>わたちゃんが現金で払った分</h2><button class="chebtn" onclick="openCash()"><span class="ic2">💴</span><span>現金で払った分を入れる<small>美容院など、カードの明細に出てこない支払い</small></span></button>';
   h += '<h2>dカードの明細</h2>';
   h += '<label class="drop"><b>📥 明細のCSVを選ぶ</b><span class="muted">dカードのサイトからダウンロードしたファイル</span><input type="file" accept=".csv,text/csv" onchange="pickFile(this)"></label>';
   h += '<div class="card" style="margin-top:12px"><b>やりかた</b><ol class="steps"><li>dカードのサイトかアプリにログイン</li><li>「ご利用明細」で月を選んで <b>CSVダウンロード</b></li><li>上のボタンからそのファイルを選ぶ</li><li>「振り分け」で要確認の分だけタップ</li></ol>';
