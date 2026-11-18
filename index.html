@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=669bc33b'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=7dfbb41b'); });
 </script>
 </head>
 <body>
@@ -514,24 +514,24 @@ function viewSum() {
   var payDay = md(m.info.pay);
 
   var H = { pay: '', me: '', gr: '' };
-  H.pay += '<div class="card hero"><div class="lbl" style="color:var(--accent)">🧮 今月これまでの家計の合計</div><div class="big num">' + yen(used + fixed) + '</div>' +
-    '<div class="muted num">カードなどで使った分 ' + yen(used) + ' ＋ 家賃などの固定費 ' + yen(fixed) + '</div></div>';
+  // 2026-11-18 文字へらし（本人：文字が多い）：見出し＋数字だけ。説明は ▸ と「？」に
+  H.pay += '<div class="card hero"><div class="lbl" style="color:var(--accent)">🧮 今月の家計</div><div class="big num">' + yen(used + fixed) + '</div></div>';
 
   H.pay += '<div class="card" style="padding:4px 16px">' +
-    '<div class="sumrow"><div><b>💙 ちぇちゃんからもらう</b><small>' + payDay + 'のカード払いの分</small></div><b class="num" style="color:var(--che)">' + yen(s.che) + '</b></div>' +
-    '<div class="sumrow"><div><b>💗 わたちゃんが自分で持つ</b><small>半分の生活費＋自分の分</small></div><b class="num" style="color:var(--wata)">' + yen(s.wata) + '</b></div></div>';
+    '<div class="sumrow"><div><b>💙 ちぇちゃんから</b><small>' + payDay + ' 払い</small></div><b class="num" style="color:var(--che)">' + yen(s.che) + '</b></div>' +
+    '<div class="sumrow"><div><b>💗 わたちゃん</b></div><b class="num" style="color:var(--wata)">' + yen(s.wata) + '</b></div></div>';
 
   H.me += goalCard(m) + saveCard(m) + nwCard(m);
 
   var notes = [];
-  if (s.undecided) notes.push('<a onclick="go(\'sort\')">🗂️ 振り分けがまだ <b>' + s.undecided + '件</b> →</a>');
-  if (s.todoItems.length) notes.push('<a onclick="openFold(\'fold-fixed\')">✍️ まだ入ってない：<b>' + s.todoItems.map(esc).join('・') + '</b> →</a>');
-  if (notes.length) H.pay += '<div class="alert">' + notes.join('<br>') + '<div style="font-size:11px;margin-top:2px">入れると上の金額が変わるよ</div></div>';
+  if (s.undecided) notes.push('<a onclick="go(\'sort\')">🗂️ 振り分け <b>' + s.undecided + '件</b> →</a>');
+  if (s.todoItems.length) notes.push('<a onclick="openFold(\'fold-fixed\')">✍️ 未入力 <b>' + s.todoItems.length + '件</b> →</a>');
+  if (notes.length) H.pay += '<div class="alert">' + notes.join('　') + '</div>';
 
   H.gr += '<h2 style="margin-top:4px">何に使った？</h2><div class="card">' + donut(m.byCategory) + '</div>';
-  H.gr += '<h2>月ごとに使った分</h2><div class="card">' + bars(m.trend) + '<p class="muted" style="margin:8px 0 0;font-size:12px">カードなどで使った分だけ（固定費は入ってない）</p></div>';
+  H.gr += '<h2>月ごとに使った分</h2><div class="card">' + bars(m.trend) + '</div>';
 
-  H.pay += '<button class="btn" style="width:100%;margin-bottom:12px" onclick="shareSummary()">📤 ちぇちゃんに今月のまとめを送る</button>';
+  H.pay += '<button class="btn" style="width:100%;margin-bottom:12px" onclick="shareSummary()">📤 ちぇちゃんに送る</button>';
 
   // ▸ 計算のなかみ（ひとつの表に）
   var row = function (op, label, v, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="op">' + op + '</td><td>' + label + '</td><td>' + yen(v) + '</td></tr>'; };
@@ -546,7 +546,7 @@ function viewSum() {
   c += '<tr><td colspan="3" class="sec" style="color:var(--wata)">💗 わたちゃん</td></tr>';
   c += row('', 'ひとり分', s.perPerson) + row('＋', '使った分' + (s.chePaidWata ? '<br><span class="muted">うち ちぇちゃんが立て替えた半分 ' + yen(s.chePaidWata) + '</span>' : ''), s.detail['わたちゃん']) + row('＋', '固定費', s.fixWata) + row('＝', '<b>自分で持つ金額</b>', s.wata, 'tot');
   c += '</table>';
-  H.pay += fold('fold-calc', '🧾 計算のなかみ', '', c);
+  H.pay += fold('fold-calc', '🧾 計算', '', c);
 
   // ▸ 固定費・手入力
   var f = '';
@@ -561,15 +561,15 @@ function viewSum() {
     });
     if (k !== 'カード合計') f += '<div class="fx" onclick="openItem(-1,\'' + k + '\')"><div class="n muted">＋ 項目を追加</div></div>';
   });
-  H.pay += fold('fold-fixed', '📌 固定費・手で入れる項目', s.todoItems.length ? '<span class="tag">' + s.todoItems.length + '件まだ</span>' : yen(fixed), f, S.openFold === 'fold-fixed');
+  H.pay += fold('fold-fixed', '📌 固定費', s.todoItems.length ? '<span class="tag">' + s.todoItems.length + '件まだ</span>' : yen(fixed), f, S.openFold === 'fold-fixed');
 
   // ▸ 貯金（2026-11-18）：先取りした額と、ほんとうに増えた額
-  if (m.savings && m.savings.income) H.me += fold('fold-save', '🐷 わたちゃんの貯金', syen(m.savings.real), saveBody(m), S.openFold === 'fold-save');
+  if (m.savings && m.savings.income) H.me += fold('fold-save', '🐷 貯金のくわしく', syen(m.savings.real), saveBody(m), S.openFold === 'fold-save');
 
   // ▸ カード代の入金
   var w = '<table class="calc num">' + row('', 'dカードの支払い（' + payDay + '）', s.cardTotal) +
     '<tr><td class="op"></td><td>三井住友に入れておく金額<br><span class="muted">カード代＋PiTaPaなど</span></td><td>' + yen(s.deposit) + '</td></tr></table>';
-  H.pay += fold('fold-flow', '💳 三井住友に入れておく金額', yen(s.deposit), w);
+  H.pay += fold('fold-flow', '💳 三井住友へ入金', yen(s.deposit), w);
 
   // ▸ 借入（2026-11-18）：あと何か月・利息いくら・早く返したらどうなるか
   (m.loans || []).forEach(function (l, li) {
@@ -587,16 +587,14 @@ function goalCard(m) {
   var over = p.left < 0, r = Math.min(1, p.ratio), pr = p.passed / p.days;
   var col = over ? 'var(--wata)' : (p.ratio > pr + 0.1 && !p.finished ? 'var(--warn)' : 'var(--oie)');
   var h = '<div class="card" onclick="openGoal()" style="cursor:pointer">';
-  h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>💗 自分の明細' + (p.finished ? '（この月）' : '（今月）') + '</b>' +
+  h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>💗 自分の明細</b>' +
     '<span class="num"><b style="font-size:18px;color:' + col + '">' + yen(p.used) + '</b><span class="muted"> ／ ' + yen(p.goal) + '</span></span></div>';
   // 使った割合と、日にちの進み（▲）
   h += '<div style="position:relative;height:12px;border-radius:6px;background:var(--line);overflow:hidden;margin:8px 0 4px"><div style="width:' + Math.round(r * 100) + '%;height:100%;background:' + col + '"></div></div>';
   if (!p.finished) h += '<div style="position:relative;height:8px;margin-top:-4px"><span style="position:absolute;left:calc(' + Math.min(97, Math.max(1, Math.round(pr * 100))) + '% - 5px);font-size:9px;color:var(--sub)">▲</span></div>';
   if (over) h += '<div class="num" style="font-size:13px;color:var(--wata)"><b>' + yen(-p.left) + ' オーバー</b></div>';
   else if (p.finished) h += '<div class="num" style="font-size:13px;color:var(--oie)"><b>' + yen(p.left) + ' 残せた👏</b></div>';
-  else h += '<div class="num" style="font-size:13px">あと <b>' + yen(p.left) + '</b>（あと' + p.daysLeft + '日・1日 <b>' + yen(p.perDay) + '</b> まで）</div>';
-  if (!p.finished && p.passed >= 7) h += '<div class="muted num" style="font-size:12px;margin-top:2px">このペースだと月末 ' + yen(p.pace) + (p.pace > p.goal ? '（' + yen(p.pace - p.goal) + ' オーバーしそう）' : '') + '</div>';
-  if (p.top.length) h += '<div class="muted num" style="font-size:11px;margin-top:4px">多いもの：' + p.top.map(function (c) { return esc(c.category) + ' ' + yen(c.amount); }).join('・') + '</div>';
+  else h += '<div class="num" style="font-size:13px">あと <b>' + yen(p.left) + '</b>・1日 <b>' + yen(p.perDay) + '</b>' + (p.passed >= 7 && p.pace > p.goal ? '　<span style="color:var(--warn)">ペース早め</span>' : '') + '</div>';
   return h + '</div>';
 }
 function openGoal() {
@@ -617,7 +615,7 @@ function nwCard(m) {
   var prev = hist.filter(function (x) { return x.month < new Date().toISOString().slice(0, 7); }).slice(-1)[0];
   var diff = prev ? n.total - prev.total : null;
   var h = '<div class="card" onclick="openFold(\'fold-save\')" style="cursor:pointer">';
-  h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>💎 わたちゃんの純資産</b><b class="num" style="font-size:20px;color:' + (n.total < 0 ? 'var(--wata)' : 'var(--oie)') + '">' + syen(n.total) + '</b></div>';
+  h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>💎 純資産</b><b class="num" style="font-size:20px;color:' + (n.total < 0 ? 'var(--wata)' : 'var(--oie)') + '">' + syen(n.total) + '</b></div>';
   if (diff !== null) h += '<div class="num" style="font-size:12px;text-align:right;color:' + (diff >= 0 ? 'var(--oie)' : 'var(--wata)') + '">先月より ' + (diff >= 0 ? '＋' : '−') + yen(Math.abs(diff)) + (diff >= 0 ? ' 👍' : '') + '</div>';
   var cell = function (ic, lb, v, col) { return '<div style="flex:1;text-align:center"><div class="muted" style="font-size:11px">' + ic + ' ' + lb + '</div><div class="num" style="font-size:13px;font-weight:700' + (col ? ';color:' + col : '') + '">' + v + '</div></div>'; };
   h += '<div style="display:flex;gap:4px;margin-top:8px">' + cell('🛟', '守る', yen(n.cash)) + cell('🌱', '増やす', yen(n.invest)) + (n.lend ? cell('🤝', '貸してる', yen(n.lend)) : '') + cell('🔻', '借金', '−' + yen(n.debt), 'var(--wata)') + '</div>';
@@ -626,7 +624,6 @@ function nwCard(m) {
     var pts = hist.map(function (x, i) { return (i * W / (hist.length - 1)).toFixed(1) + ',' + (H - (x.total - mn) / rg * H).toFixed(1); }).join(' ');
     h += '<svg viewBox="-4 -4 ' + (W + 8) + ' ' + (H + 8) + '" style="width:100%;height:44px;margin-top:6px"><polyline points="' + pts + '" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>';
   }
-  if (!n.invest) h += '<div class="muted" style="font-size:11px;margin-top:4px">NISA・企業型DCの残高を「＋ 口座を追加」（種類：投資）で入れると、増やすに入るよ</div>';
   return h + '</div>';
 }
 /* ---------- 使い方ガイド（2026-11-18：初めて見る人でもわかるように） ---------- */
@@ -677,20 +674,18 @@ function syen(x) { return (x < 0 ? '−' : '') + yen(Math.abs(x)); }
 function pct(r) { return r === null || r === undefined ? '−' : Math.round(r * 100) + '%'; }
 function saveCard(m) {
   var v = m.savings;
-  if (!v || !v.income) return '<div class="card" style="font-size:13px"><a onclick="openFold(\'fold-fixed\')">🐷 <b>収入</b>を入れると、今月ほんとうに貯金できたかが出るよ →</a></div>';
+  if (!v || !v.income) return '<div class="card" style="font-size:13px"><a onclick="openFold(\'fold-fixed\')">🐷 収入を入れると貯金が出るよ →</a></div>';
   var neg = v.real < 0;
   return '<div class="card" onclick="openFold(\'fold-save\')" style="cursor:pointer">' +
-    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>🐷 今月ほんとうに' + (neg ? 'へった' : '増えた') + '貯金</b>' +
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>🐷 今月の貯金</b>' +
     '<b class="num" style="font-size:20px;color:' + (neg ? 'var(--wata)' : 'var(--oie)') + '">' + (neg ? '−' : '＋') + yen(Math.abs(v.real)) + '</b></div>' +
-    '<div class="muted num" style="font-size:12px;margin-top:2px">収入 ' + yen(v.income) + ' − 自分で持つ金額 ' + yen(v.spend) + '・貯蓄率 ' + pct(v.rate) + '</div>' +
-    (v.pre ? '<div class="num" style="font-size:12px;margin-top:6px">先取りした額 ' + yen(v.pre) + (v.short ? '　<span style="color:var(--wata)">→ うち ' + yen(Math.min(v.short, v.pre)) + ' は貯金から戻す計算' + (v.short > v.pre ? '、さらに ' + yen(v.short - v.pre) + ' 足りない' : '') + '</span>' : '　<span style="color:var(--oie)">→ 守れてる👏</span>') + '</div>' : '') +
-    defLine(m) + '</div>';
+    '<div class="muted num" style="font-size:12px;margin-top:2px">貯蓄率 ' + pct(v.rate) + (v.pre ? '・先取り ' + yen(v.pre) + (v.short ? ' <span style="color:var(--wata)">守れてない</span>' : ' 👏') : '') + defLine(m) + '</div></div>';
 }
 function defLine(m) {
   var d = m.defense;
   if (!d) return '';
-  if (!(m.accounts || []).length) return '<div style="font-size:12px;margin-top:6px;color:var(--accent)">🛟 貯金の残高を入れると、生活防衛資金が何か月分あるか出るよ →</div>';
-  return '<div class="num" style="font-size:12px;margin-top:6px">🛟 生活防衛資金 <b>' + (d.covered === null ? '−' : d.covered.toFixed(1)) + 'か月分</b>（目安 ' + d.months + 'か月分）</div>';
+  if (!(m.accounts || []).length) return '';
+  return '・🛟 ' + (d.covered === null ? '−' : d.covered.toFixed(1)) + 'か月分';
 }
 function defBody(m) {
   var d = m.defense, acc = m.accounts || [];
