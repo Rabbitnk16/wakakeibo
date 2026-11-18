@@ -215,6 +215,7 @@ ol.steps li { margin: 3px 0; }
 .loading { text-align: center; padding: 60px 0; color: var(--sub); }
 .spin { display: inline-block; width: 22px; height: 22px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.8s linear infinite; }
 @keyframes sp { to { transform: rotate(360deg); } }
+.stale #mlabel::after { content: ' ⟳'; opacity: .45; font-weight: 400; }
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -240,7 +241,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=beb0435e'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=70d2e60c'); });
 </script>
 </head>
 <body>
@@ -324,6 +325,7 @@ function $(id) { return document.getElementById(id); }
 
 /* ---------- 画面全体 ---------- */
 function setMonth(m) {
+  document.body.classList.remove('stale');
   S.m = m; S.period = m.info.period; S.skipped = {};
   if (S.periods.indexOf(S.period) < 0) { S.periods.push(S.period); S.periods.sort(); }
   render();
@@ -1161,15 +1163,33 @@ function changeMonth(d) {
 $('prev').onclick = function () { changeMonth(-1); };
 $('next').onclick = function () { changeMonth(1); };
 
-(window.WK_KEY ? call('getBootstrap') : new Promise(function () {})).then(function (b) {
+// 起動を速く（2026-11-18）：前回の画面をこの端末に覚えておいて、すぐ出す。裏で最新を読んで入れ替える
+var BOOT_KEY = 'wk_boot_' + String(window.WK_KEY || 'gas').slice(0, 8), booted = false;
+function startApp(b, fromCache) {
   S.periods = b.periods; S.categories = b.categories; S.role = b.role || 'wata';
-  if (S.role === 'che') {
-    $('tabs').innerHTML = '<button data-tab="ckakei"><span class="ic">📊</span>今月の家計</button><button data-tab="csum"><span class="ic">💙</span>今月の精算</button><button data-tab="cpay"><span class="ic">📷</span>払った分</button>';
-    S.tab = 'ckakei';
+  if (!booted) {
+    if (S.role === 'che') {
+      $('tabs').innerHTML = '<button data-tab="ckakei"><span class="ic">📊</span>今月の家計</button><button data-tab="csum"><span class="ic">💙</span>今月の精算</button><button data-tab="cpay"><span class="ic">📷</span>払った分</button>';
+      S.tab = 'ckakei';
+    }
+    booted = true;
+    setMonth(b.month);
+    if (S.role !== 'che' && !undecided().length) S.tab = 'sum', render();
+    if (fromCache) document.body.classList.add('stale');
+    return;
   }
-  setMonth(b.month);
-  if (S.role !== 'che' && !undecided().length) S.tab = 'sum', render();
-}).catch(function (e) { $('view').innerHTML = '<div class="card">⚠️ 読み込めなかった：' + esc(e && e.message || e) + '</div>'; });
+  document.body.classList.remove('stale');
+  // 2回目（最新が届いた）：同じ月を見ていて、編集中でなければ入れ替える
+  if (S.period === b.month.info.period && !$('sheet').classList.contains('on')) { var tab = S.tab; setMonth(b.month); S.tab = tab; render(); }
+}
+try { var cachedBoot = JSON.parse(localStorage.getItem(BOOT_KEY) || 'null'); if (cachedBoot && cachedBoot.month) startApp(cachedBoot, true); } catch (e) {}
+(window.WK_KEY ? call('getBootstrap') : new Promise(function () {})).then(function (b) {
+  try { localStorage.setItem(BOOT_KEY, JSON.stringify(b)); } catch (e) {}
+  startApp(b, false);
+}).catch(function (e) {
+  if (booted) { document.body.classList.remove('stale'); toast('⚠️ 最新を読めなかった（前に見た内容を表示中）'); return; }
+  $('view').innerHTML = '<div class="card">⚠️ 読み込めなかった：' + esc(e && e.message || e) + '</div>';
+});
 </script>
 </body>
 </html>
