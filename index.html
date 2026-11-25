@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=236d2927'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=91a96b40'); });
 </script>
 </head>
 <body>
@@ -1305,6 +1305,7 @@ function info(p) { var n = shift(p, 1); return { pay: n.slice(0, 4) + '/' + n.sl
 function go(tab) { S.tab = tab; render(); window.scrollTo(0, 0); }
 $('tabs').onclick = function (e) { var b = e.target.closest('button'); if (b) go(b.dataset.tab); };
 function changeMonth(d) {
+  S.userMoved = true;
   var p = shift(S.period, d);
   $('view').innerHTML = '<div class="loading"><span class="spin"></span></div>';
   call('getMonth', p).then(setMonth).catch(fail);
@@ -1328,8 +1329,9 @@ function startApp(b, fromCache) {
     return;
   }
   document.body.classList.remove('stale');
-  // 2回目（最新が届いた）：同じ月を見ていて、編集中でなければ入れ替える
-  if (S.period === b.month.info.period && !$('sheet').classList.contains('on')) { var tab = S.tab; setMonth(b.month); S.tab = tab; render(); }
+  // 2回目（最新が届いた）：まだ月を動かしていない（または同じ月を見ている）・編集中でなければ入れ替える。
+  // 前回の表示と開く月がちがうとき（12/10を過ぎて次の月になった、など）も、ここで最新の月に切り替わる
+  if ((!S.userMoved || S.period === b.month.info.period) && !$('sheet').classList.contains('on')) { var tab = S.tab; setMonth(b.month); S.tab = tab; render(); }
 }
 try { var cachedBoot = JSON.parse(localStorage.getItem(BOOT_KEY) || 'null'); if (cachedBoot && cachedBoot.month) startApp(cachedBoot, true); } catch (e) {}
 (window.WK_KEY ? call('getBootstrap') : new Promise(function () {})).then(function (b) {
