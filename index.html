@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=91a96b40'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=c997aa09'); });
 </script>
 </head>
 <body>
@@ -587,7 +587,7 @@ function viewSum() {
   if (m.savings && m.savings.income) H.me += fold('fold-save', '🐷 貯金のくわしく', syen(m.savings.real), saveBody(m), S.openFold === 'fold-save');
 
   // ▸ カード代の入金
-  var w = '<table class="calc num">' + row('', 'dカードの支払い（' + payDay + '）', s.cardTotal) +
+  var w = '<table class="calc num">' + row('', 'dカードの支払い（' + payDay + '）', s.cardTotal) + (s.smbcTotal ? row('＋', '三井住友カード', s.smbcTotal) : '') +
     '<tr><td class="op"></td><td>三井住友に入れておく金額<br><span class="muted">カード代＋PiTaPaなど</span></td><td>' + yen(s.deposit) + '</td></tr></table>';
   H.pay += fold('fold-flow', '💳 三井住友へ入金', yen(s.deposit), w);
 
