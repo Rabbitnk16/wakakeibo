@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=c997aa09'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=5b7397b0'); });
 </script>
 </head>
 <body>
@@ -606,8 +606,8 @@ function goalCard(m) {
   if (!p.goal) return '<div class="card" style="font-size:13px"><a onclick="openGoal()">💗 <b>自分の明細の月の目標</b>を決めると、あといくら使えるかが出るよ →</a></div>';
   var over = p.left < 0, r = Math.min(1, p.ratio), pr = p.passed / p.days;
   var col = over ? 'var(--wata)' : (p.ratio > pr + 0.1 && !p.finished ? 'var(--warn)' : 'var(--oie)');
-  var h = '<div class="card" onclick="openGoal()" style="cursor:pointer">';
-  h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>💗 自分の明細</b>' +
+  var h = '<div class="card" onclick="openMine()" style="cursor:pointer">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>💗 自分の明細 <span class="muted" style="font-size:12px;font-weight:500">内訳 ›</span></b>' +
     '<span class="num"><b style="font-size:18px;color:' + col + '">' + yen(p.used) + '</b><span class="muted"> ／ ' + yen(p.goal) + '</span></span></div>';
   // 使った割合と、日にちの進み（▲）
   h += '<div style="position:relative;height:12px;border-radius:6px;background:var(--line);overflow:hidden;margin:8px 0 4px"><div style="width:' + Math.round(r * 100) + '%;height:100%;background:' + col + '"></div></div>';
@@ -616,6 +616,27 @@ function goalCard(m) {
   else if (p.finished) h += '<div class="num" style="font-size:13px;color:var(--oie)"><b>' + yen(p.left) + ' 残せた👏</b></div>';
   else h += '<div class="num" style="font-size:13px">あと <b>' + yen(p.left) + '</b>・1日 <b>' + yen(p.perDay) + '</b>' + (p.passed >= 7 && p.pace > p.goal ? '　<span style="color:var(--warn)">ペース早め</span>' : '') + '</div>';
   return h + '</div>';
+}
+/** 2026-11-25（本人：わたちゃんの金額が大きい、何にかかってるか見たい）：自分で持つ金額の内訳・カテゴリ・大きい順 */
+function openMine() {
+  var m = S.m, s = m.summary;
+  var mine = m.txs.filter(function (t) { return t.who === 'わたちゃん' && t.payer !== 'ちぇちゃん'; });
+  var used = mine.reduce(function (a, t) { return a + t.amount; }, 0);
+  var cats = {};
+  mine.forEach(function (t) { var c = t.category || 'その他'; cats[c] = (cats[c] || 0) + t.amount; });
+  var catList = Object.keys(cats).map(function (c) { return { category: c, amount: cats[c] }; }).sort(function (a, b) { return b.amount - a.amount; });
+  var h = '<div class="grab"></div><b style="font-size:17px">💗 わたちゃんが持つ ' + yen(s.wata) + '</b>';
+  h += '<table class="calc num" style="margin-top:8px"><tr><td class="op"></td><td>🏠 お家の半分</td><td>' + yen(s.perPerson) + '</td></tr>' +
+    '<tr><td class="op">＋</td><td><b>自分の明細</b></td><td><b>' + yen(used) + '</b></td></tr>' +
+    '<tr><td class="op">＋</td><td>固定費（ローン・脱毛など）</td><td>' + yen(s.fixWata) + '</td></tr></table>';
+  h += '<div style="margin:16px 0 6px;font-weight:700">何に使った？</div>' + donut(catList);
+  h += '<div style="margin:16px 0 6px;font-weight:700">大きい順</div><div class="list" style="margin:0">';
+  mine.slice().sort(function (a, b) { return b.amount - a.amount; }).slice(0, 15).forEach(function (t) {
+    var nn = niceName(t);
+    h += '<div class="item" style="cursor:default"><span class="dot wata"></span><div class="mid"><div class="t">' + esc(nn.name) + (t.noBudget ? ' 🚫' : '') + '</div><div class="s">' + md(t.date) + '・' + esc(t.category || 'その他') + '</div></div><div class="a num">' + yen(t.amount) + '</div></div>';
+  });
+  h += '</div><div class="btns"><button class="btn" onclick="closeSheet();S.filter=\'わたちゃん\';go(\'list\')">明細ぜんぶ</button><button class="btn" onclick="openGoal()">目標を変える</button><button class="btn primary" onclick="closeSheet()">とじる</button></div>';
+  openSheet(h);
 }
 function openGoal() {
   var p = S.m.personal || {};
