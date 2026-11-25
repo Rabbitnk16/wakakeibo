@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=c22f9299'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=85b10f4b'); });
 </script>
 </head>
 <body>
@@ -558,7 +558,7 @@ function viewSum() {
   var c = '<table class="calc num">';
   c += '<tr><td colspan="3" class="sec" style="color:var(--oie)">🏠 ふたりで半分ずつ</td></tr>';
   // 2026-11-25（本人：なんで割ってるのに？）→「お家の半分」と「自分だけの買い物」を言葉で分ける
-  c += row('', 'お家の買い物', s.detail['お家']) + row('＋', 'お家の固定費（家賃など）', s.fixHalf) + row('÷2', '<b>ひとり分</b>', s.perPerson, 'tot');
+  c += row('', '<a onclick="openHome()">お家の買い物 ›</a>', s.detail['お家']) + row('＋', 'お家の固定費（家賃など）', s.fixHalf) + row('÷2', '<b>ひとり分</b>', s.perPerson, 'tot');
   c += '<tr><td colspan="3" class="sec" style="color:var(--che)">💙 ちぇちゃん</td></tr>';
   // 立て替えた分は「ちぇちゃんの半分」は使った分から外して、「わたちゃんの半分」だけを引く形で見せる（結果は同じ）
   c += row('', 'お家の半分', s.perPerson) + row('＋', 'ちぇちゃんだけの買い物', s.detail['ちぇちゃん'] - (s.chePaidChe || 0)) + row('＋', 'ちぇちゃんの固定費', s.fixChe);
@@ -637,6 +637,34 @@ function openMine() {
     h += '<div class="item" style="cursor:default"><span class="dot wata"></span><div class="mid"><div class="t">' + esc(nn.name) + (t.noBudget ? ' 🚫' : '') + '</div><div class="s">' + md(t.date) + '・' + esc(t.category || 'その他') + '</div></div><div class="a num">' + yen(t.amount) + '</div></div>';
   });
   h += '</div><div class="btns"><button class="btn" onclick="closeSheet();S.filter=\'わたちゃん\';go(\'list\')">明細ぜんぶ</button><button class="btn" onclick="openGoal()">目標を変える</button><button class="btn primary" onclick="closeSheet()">とじる</button></div>';
+  openSheet(h);
+}
+/** 2026-11-25（本人：お家で何に大きく使ったか、アプリで見たい）：お家の買い物のカテゴリ・予算・大きい順。ちぇちゃん画面からも開ける */
+function openHome() {
+  var m = S.m, che = S.role === 'che';
+  var home = m.txs.filter(function (t) { return t.who === 'お家'; });
+  var used = home.reduce(function (a, t) { return a + t.amount; }, 0);
+  var bud = (!che && m.budget && m.budget['家族'] && m.budget['家族'].budgets) || {};
+  var cats = {}, cnt = {};
+  home.forEach(function (t) { var c = t.category || 'その他'; cats[c] = (cats[c] || 0) + t.amount; cnt[c] = (cnt[c] || 0) + 1; });
+  var catList = Object.keys(cats).map(function (c) { return { category: c, amount: cats[c] }; }).sort(function (a, b) { return b.amount - a.amount; });
+  var h = '<div class="grab"></div><b style="font-size:17px">🏠 お家の買い物 ' + yen(used) + '</b>';
+  h += '<div class="muted" style="font-size:12px">ひとり分は半分の ' + yen(Math.floor(used / 2)) + '</div>';
+  h += '<div style="margin:16px 0 6px;font-weight:700">何に使った？</div>' + donut(catList);
+  var withB = catList.filter(function (c) { return bud[c.category]; });
+  if (withB.length) h += '<div style="margin:16px 0 6px;font-weight:700">予算とくらべると</div><div class="card" style="padding:8px 12px">';
+  withB.forEach(function (c) {
+    var b = bud[c.category], over = b && c.amount > b;
+    h += '<div class="row" style="padding:5px 0;font-size:14px"><span>' + esc(c.category) + ' <span class="muted" style="font-size:11px">' + cnt[c.category] + '件</span></span><span class="num"><b' + (over ? ' style="color:var(--wata)"' : '') + '>' + yen(c.amount) + '</b>' +
+      (b ? '<span class="muted" style="font-size:12px"> / ' + yen(b) + '</span>' + (over ? '<div style="font-size:11px;color:var(--wata);text-align:right">+' + yen(c.amount - b) + '</div>' : '') : '') + '</span></div>';
+  });
+  if (withB.length) h += '</div>';
+  h += '<div style="margin:16px 0 6px;font-weight:700">大きい順</div><div class="list" style="margin:0">';
+  home.slice().sort(function (a, b) { return b.amount - a.amount; }).slice(0, 15).forEach(function (t) {
+    var nn = niceName(t);
+    h += '<div class="item" style="cursor:default"><span class="dot oie"></span><div class="mid"><div class="t">' + esc(nn.name) + (t.memo ? ' <span class="muted" style="font-size:11px">' + esc(t.memo) + '</span>' : '') + '</div><div class="s">' + md(t.date) + '・' + esc(t.category || 'その他') + '</div></div><div class="a num">' + yen(t.amount) + '</div></div>';
+  });
+  h += '</div><div class="btns">' + (che ? '' : '<button class="btn" onclick="closeSheet();S.filter=\'お家\';go(\'list\')">明細ぜんぶ</button>') + '<button class="btn primary" onclick="closeSheet()">とじる</button></div>';
   openSheet(h);
 }
 function openGoal() {
@@ -1126,7 +1154,7 @@ function viewCheSum() {
   h += '<div class="card hero"><div class="lbl">💙 わたちゃんへ</div><div class="big num">' + yen(s.che) + '</div><div class="muted">' + md(m.info.pay) + ' 払い</div></div>';
   var c = '<table class="calc num">';
   c += '<tr><td colspan="3" class="sec" style="color:var(--oie)">🏠 半分ずつ</td></tr>';
-  c += '<tr><td class="op"></td><td>お家の買い物</td><td>' + yen(s.oie) + '</td></tr>';
+  c += '<tr><td class="op"></td><td><a onclick="openHome()">お家の買い物 ›</a></td><td>' + yen(s.oie) + '</td></tr>';
   m.itemsHalf.forEach(function (i) { c += '<tr><td class="op">＋</td><td>' + esc(i.name.replace(/（.*?）/g, '')) + '</td><td>' + (i.amount === '' || i.amount === null ? '<span style="color:var(--warn)">まだ</span>' : yen(i.amount)) + '</td></tr>'; });
   c += '<tr class="tot"><td class="op">÷2</td><td>ひとり分</td><td>' + yen(s.perPerson) + '</td></tr>';
   c += '<tr><td colspan="3" class="sec" style="color:var(--che)">💙 ちぇちゃん</td></tr>';
