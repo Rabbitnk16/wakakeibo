@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=85b10f4b'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=b82f6b9d'); });
 </script>
 </head>
 <body>
@@ -415,7 +415,8 @@ function refreshSoon() {
     if (Object.keys(S.pending).length) return; // まだ保存中のものがある → その返事のあとでまた呼ばれる
     var per = S.period;
     call('getMonth', per).then(function (m) {
-      if (per !== S.period || Object.keys(S.pending).length || $('sheet').classList.contains('on')) return;
+      if (per !== S.period || Object.keys(S.pending).length) return;
+      if ($('sheet').classList.contains('on')) return refreshSoon(); // 何か開いてる間は待って、閉じたあとに入れ替える
       var sk = S.skipped, tab = S.tab; S.m = m; S.skipped = sk; S.tab = tab; render();
     }).catch(function () {});
   }, 1500);
@@ -519,8 +520,19 @@ function saveEdit() {
   if ($('e-nobud').checked !== !!t.noBudget) patch.noBudget = $('e-nobud').checked;
   if (rw !== t.ruleWho) { opts.ruleWho = rw; if (rw && !E.who) return toast('「だれの」を選んでね'); if (rw && !patch.who) patch.who = E.who; }
   if (!Object.keys(patch).length && opts.ruleWho === undefined) return closeSheet();
-  $('e-save').disabled = true;
-  call('updateTx', E.id, patch, opts).then(function (m) { closeSheet(); setMonth(m); toast('保存したよ'); }).catch(function (e) { $('e-save').disabled = false; fail(e); });
+  // 2026-11-25（本人：保存にちょい時間かかる）→ 画面を先に変えて、すぐ閉じる。重い再計算はあとで裏で
+  var id = E.id, before = JSON.parse(JSON.stringify(t));
+  if (patch.display !== undefined) { t.shown = patch.display; t.ruleName = !!opts.ruleName; }
+  if (patch.memo !== undefined) t.memo = patch.memo;
+  if (patch.category !== undefined) t.category = patch.category;
+  if (patch.who !== undefined) { t.who = patch.who; t.status = patch.who ? '確定' : '要確認'; }
+  if (patch.enemy !== undefined) t.enemy = patch.enemy;
+  if (patch.noBudget !== undefined) t.noBudget = patch.noBudget;
+  if (opts.ruleWho !== undefined) t.ruleWho = opts.ruleWho;
+  opts.light = true; S.pending[id] = 1;
+  closeSheet(); render(); toast('保存したよ');
+  call('updateTx', id, patch, opts).then(function () { delete S.pending[id]; refreshSoon(); })
+    .catch(function (e) { delete S.pending[id]; Object.keys(before).forEach(function (k) { t[k] = before[k]; }); render(); fail(e); });
 }
 function openSheet(h) { $('sheet').innerHTML = h; $('sheet').classList.add('on'); $('veil').classList.add('on'); }
 function closeSheet() { $('sheet').classList.remove('on'); $('veil').classList.remove('on'); }
