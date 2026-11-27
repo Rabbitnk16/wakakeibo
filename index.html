@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=b82f6b9d'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=58dc30e5'); });
 </script>
 </head>
 <body>
@@ -1147,12 +1147,23 @@ function shrink(file, max) {
 function saveChe() {
   var e = { id: E.id, period: $('c-per').value, date: $('c-date').value.replace(/-/g, '/'), name: $('c-name').value, amount: $('c-amt').value,
     payType: E.payType, category: $('c-cat').value, memo: $('c-memo').value };
-  $('c-save').disabled = true;
-  call('saveChePaid', e).then(function (m) { closeSheet(); if (m.info.period === S.period) setMonth(m); toast('保存したよ・わたちゃん負担 ' + yen(Number(e.amount) / 2)); }).catch(function (er) { $('c-save').disabled = false; fail(er); });
+  // 2026-11-27（本人：ちぇちゃん画面も早く）→ すぐ閉じて、保存と計算は裏で。失敗したら入れた内容のまま開き直す
+  var html = $('sheet').innerHTML, keep = {}, eid = E;
+  Array.prototype.forEach.call($('sheet').querySelectorAll('input,select,textarea'), function (x) { if (x.id && x.type !== 'file') keep[x.id] = x.value; });
+  var other = e.period !== S.period;
+  closeSheet(); toast((other ? Number(e.period.slice(5)) + '月分に' : '') + '保存したよ・わたちゃん負担 ' + yen(Number(e.amount) - Math.floor(Number(e.amount) / 2)));
+  call('saveChePaid', e).then(function (m) { if (m.info.period === S.period) setMonth(m); })
+    .catch(function (er) {
+      E = eid; openSheet(html); Object.keys(keep).forEach(function (k) { if ($(k)) $(k).value = keep[k]; });
+      if ($('c-save')) $('c-save').disabled = false; fail(er);
+    });
 }
 function delChe() {
   if (!confirm('この明細を消す？')) return;
-  call('deleteChePaid', E.id).then(function (m) { closeSheet(); setMonth(m); toast('消したよ'); }).catch(fail);
+  var gid = String(E.id).replace(/\|[ちわ]$/, ''), before = S.m.txs.slice();
+  S.m.txs = S.m.txs.filter(function (t) { return String(t.id).indexOf(gid) !== 0; });
+  closeSheet(); render(); toast('消したよ');
+  call('deleteChePaid', E.id).then(function (m) { if (m.info.period === S.period) setMonth(m); }).catch(function (er) { S.m.txs = before; render(); fail(er); });
 }
 
 /* ---------- ちぇちゃん用の画面 ---------- */
