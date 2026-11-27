@@ -260,7 +260,7 @@ window.WK_API = "https://script.google.com/macros/s/AKfycbyZpZGq61U6PdOH8C3E9pPE
   try { if (k) localStorage.setItem('wk_k', k); else k = localStorage.getItem('wk_k'); } catch (e) {}
   window.WK_KEY = k || '';
 })();
-if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=58dc30e5'); });
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js?v=a4d4ca2c'); });
 </script>
 </head>
 <body>
@@ -547,6 +547,8 @@ function viewSum() {
 
   var H = { pay: '', me: '', gr: '' };
   // 2026-11-18 文字へらし（本人：文字が多い）：見出し＋数字だけ。説明は ▸ と「？」に
+  var qr = m.quickReqs || [];
+  if (qr.length) H.pay += '<div class="alert" onclick="openQuick()">💙 ちぇちゃんから「すぐ返して」 <b>' + yen(qr.reduce(function (a, x) { return a + x.amount; }, 0)) + '</b>（' + qr.length + '件） →</div>';
   H.pay += '<div class="card hero"><div class="lbl" style="color:var(--accent)">🧮 今月の家計</div><div class="big num">' + yen(used + fixed) + '</div></div>';
 
   H.pay += '<div class="card" style="padding:4px 16px">' +
@@ -678,6 +680,65 @@ function openHome() {
   });
   h += '</div><div class="btns">' + (che ? '' : '<button class="btn" onclick="closeSheet();S.filter=\'お家\';go(\'list\')">明細ぜんぶ</button>') + '<button class="btn primary" onclick="closeSheet()">とじる</button></div>';
   openSheet(h);
+}
+/** 2026-11-27 ちぇちゃんの「すぐ返して」の請求：わたちゃんが払ったら✅ */
+function openQuick() {
+  var q = S.m.quickReqs || [];
+  var h = '<div class="grab"></div><b style="font-size:17px">💙 すぐ返して の請求</b>';
+  h += '<div class="muted" style="font-size:12px">ちぇちゃんが立て替えた分。払ったら「払った」を押してね（精算からは引かれないよ）</div><div class="list" style="margin:10px 0 0">';
+  if (!q.length) h += '<div class="empty">ぜんぶ払ったよ👏</div>';
+  q.forEach(function (x) {
+    h += '<div class="item" style="cursor:default"><span class="dot che"></span><div class="mid"><div class="t">' + esc(x.name) + '</div><div class="s">' + md(x.date) + '・' + label(x.period) + (memoUser(x.memo) ? '・' + esc(memoUser(x.memo)) : '') + '</div></div><div class="a num">' + yen(x.amount) + '</div>' +
+      '<button class="btn primary" style="flex:0 0 auto;padding:6px 10px;margin-left:8px;font-size:13px" onclick="quickPaid(\'' + esc(x.id) + '\',this)">払った</button></div>';
+  });
+  h += '</div><div class="btns"><button class="btn primary" onclick="closeSheet()">とじる</button></div>';
+  openSheet(h);
+}
+function quickPaid(id, b) {
+  b.disabled = true;
+  S.m.quickReqs = (S.m.quickReqs || []).filter(function (x) { return x.id !== id; });
+  S.pending['q' + id] = 1; openQuick(); render(); toast('払ったよ✅');
+  call('markQuickPaid', id, S.period).then(function () { delete S.pending['q' + id]; refreshSoon(); })
+    .catch(function (e) { delete S.pending['q' + id]; refreshSoon(); fail(e); });
+}
+/** 2026-11-27（本人：ちぇちゃんも自分の内訳を見て、カテゴリを直せるように） */
+function openCheMine() {
+  var mine = S.m.txs.filter(function (t) { return t.who === 'ちぇちゃん'; });
+  var used = mine.reduce(function (a, t) { return a + t.amount; }, 0), cats = {};
+  mine.forEach(function (t) { var c = t.category || 'その他'; cats[c] = (cats[c] || 0) + t.amount; });
+  var catList = Object.keys(cats).map(function (c) { return { category: c, amount: cats[c] }; }).sort(function (a, b) { return b.amount - a.amount; });
+  var h = '<div class="grab"></div><b style="font-size:17px">💙 ちぇちゃんの買い物 ' + yen(used) + '</b>';
+  h += '<div class="muted" style="font-size:12px">タップでカテゴリを直せるよ</div>';
+  h += '<div style="margin:14px 0 6px;font-weight:700">何に使った？</div>' + donut(catList);
+  h += '<div style="margin:16px 0 6px;font-weight:700">大きい順</div><div class="list" style="margin:0">';
+  if (!mine.length) h += '<div class="empty">なし</div>';
+  mine.slice().sort(function (a, b) { return b.amount - a.amount; }).forEach(function (t) {
+    var nn = niceName(t);
+    h += '<div class="item" onclick="openCheCat(\'' + esc(t.id) + '\')"><span class="dot che"></span><div class="mid"><div class="t">' + esc(nn.name) + (t.payer === 'ちぇちゃん' ? ' 💙' : '') + '</div><div class="s">' + md(t.date) + '・' + esc(t.category || 'その他') + ' ✏️</div></div><div class="a num">' + yen(t.amount) + '</div></div>';
+  });
+  h += '</div><div class="btns"><button class="btn primary" onclick="closeSheet()">とじる</button></div>';
+  openSheet(h);
+}
+function openCheCat(id) {
+  var t = S.m.txs.filter(function (x) { return x.id === id; })[0]; if (!t) return;
+  E = { catId: id };
+  var h = '<div class="grab"></div><b style="font-size:17px">' + esc(niceName(t).name) + '</b><div class="muted num">' + md(t.date) + '・' + yen(t.amount) + '</div>';
+  h += '<label class="f">カテゴリ</label><div class="catpick">' + S.categories.map(function (c) {
+    return '<button class="btn' + (c === t.category ? ' primary' : '') + '" style="margin:3px;padding:8px 10px;font-size:13px" onclick="saveCheCat(' + JSON.stringify(c).replace(/"/g, '&quot;') + ')">' + esc(c) + '</button>';
+  }).join('') + '</div>';
+  h += '<div class="btns"><button class="btn" onclick="openCheMine()">もどる</button></div>';
+  openSheet(h);
+}
+function saveCheCat(cat) {
+  var id = E.catId, t = S.m.txs.filter(function (x) { return x.id === id; })[0];
+  var grp = t.payer === 'ちぇちゃん' ? S.m.txs.filter(function (x) { return x.payer === 'ちぇちゃん' && gidOf(x.id) === gidOf(id); }) : [t];
+  var before = grp.map(function (x) { return x.category; });
+  grp.forEach(function (x) { x.category = cat; });
+  S.pending['c' + id] = 1; openCheMine(); render(); toast(cat + ' にしたよ');
+  call('setCheCategory', id, cat).then(function (m) {
+    delete S.pending['c' + id];
+    if (m && m.info && m.info.period === S.period && !Object.keys(S.pending).length && !$('sheet').classList.contains('on')) setMonth(m);
+  }).catch(function (e) { delete S.pending['c' + id]; grp.forEach(function (x, i) { x.category = before[i]; }); render(); fail(e); });
 }
 function openGoal() {
   var p = S.m.personal || {};
@@ -983,14 +1044,14 @@ function cheGroups(txs) {
     var k = gidOf(t.id);
     if (!g[k]) { g[k] = { id: t.id, gid: k, period: t.period, date: t.date, name: t.name, payType: t.payType, category: t.category, memo: memoUser(t.memo), total: 0, che: 0, wata: 0 }; order.push(k); }
     g[k].total += t.amount;
-    if (t.who === 'ちぇちゃん') g[k].che += t.amount; else if (t.who === 'わたちゃん') g[k].wata += t.amount;
+    if (t.who === 'ちぇちゃん') g[k].che += t.amount; else if (t.who === 'わたちゃん') { g[k].wata += t.amount; g[k].quick = t.quick || ''; }
   });
-  return order.map(function (k) { return g[k]; });
+  return order.map(function (k) { g[k].whose = g[k].che ? 'half' : 'wata'; return g[k]; });
 }
 function openChe(id) {
   var t = id ? cheGroups(S.m.txs).filter(function (x) { return x.gid === gidOf(id); })[0] : null;
-  if (t) t = { id: t.id, period: t.period, date: t.date, name: t.name, amount: t.total, payType: t.payType, category: t.category, memo: t.memo };
-  E = { che: true, id: id || '', payType: t ? t.payType || '現金' : 'd払い' };
+  if (t) t = { id: t.id, period: t.period, date: t.date, name: t.name, amount: t.total, payType: t.payType, category: t.category, memo: t.memo, whose: t.whose, quick: t.quick };
+  E = { che: true, id: id || '', payType: t ? t.payType || '現金' : 'd払い', whose: t ? t.whose : 'half', quick: !!(t && t.quick), quickDone: t && t.quick === '済' };
   var per = t ? t.period : S.period;
   var h = '<div class="grab"></div><b style="font-size:17px">' + (t ? 'ちぇちゃんが払った分を直す' : 'ちぇちゃんが払った分') + '</b>';
   if (!t) h += '<div class="cam" style="margin-top:12px"><label>📷 レシートを撮る<input type="file" accept="image/*" capture="environment" onchange="readPhoto(this)"></label><label>🖼️ 写真・スクショを選ぶ<input type="file" accept="image/*,.heic,.heif" onchange="readPhoto(this)"></label></div><div id="c-ocr" class="muted" style="margin-top:6px;font-size:12px">撮るとAIが日付・お店・合計を読んで入れてくれるよ（入ったら必ず確認してね）</div>';
@@ -1000,6 +1061,10 @@ function openChe(id) {
   h += '<label class="f">払い方</label><div class="seg" id="c-pay">' + ['d払い', '現金', 'カード', 'ちぇちぇ立替', 'その他'].map(function (p) {
     return '<button class="' + (E.payType === p ? 'on' : '') + '" style="color:var(--che);background:var(--che-bg)" onclick="E.payType=\'' + p + '\';Array.prototype.forEach.call(this.parentNode.children,function(x){x.classList.remove(\'on\')});this.classList.add(\'on\')">' + p + '</button>';
   }).join('') + '</div>';
+  // 2026-11-27（本人：立て替えた分をすぐ欲しい・半分欲しいを請求したい）
+  var segBtn = function (key, val, label) { return '<button class="' + (E[key] === val ? 'on' : '') + '" style="color:var(--che);background:var(--che-bg)" onclick="E.' + key + '=' + JSON.stringify(val).replace(/"/g, '&quot;') + ';Array.prototype.forEach.call(this.parentNode.children,function(x){x.classList.remove(\'on\')});this.classList.add(\'on\');halfNote()">' + label + '</button>'; };
+  h += '<label class="f">だれの物？</label><div class="seg">' + segBtn('whose', 'half', '🏠 お家（半分ずつ）') + segBtn('whose', 'wata', '💗 わたちゃんの物') + '</div>';
+  h += '<label class="f">わたちゃんの分はいつ返してもらう？</label>' + (E.quickDone ? '<div class="muted" style="font-size:13px">✅ もう返してもらったよ</div>' : '<div class="seg">' + segBtn('quick', false, '📅 次の精算で') + segBtn('quick', true, '⚡ すぐ返して') + '</div>');
   h += '<label class="f">カテゴリ（空ならお店の名前から自動）</label><select class="in" id="c-cat"><option value="">自動で決める</option>' + S.categories.map(function (c) { return '<option' + (t && c === t.category ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
   h += '<label class="f">メモ</label><input class="in" id="c-memo" value="' + esc(t ? t.memo : '') + '">';
   h += '<label class="f">どの月の精算に入れる？（日付から自動）</label><select class="in" id="c-per" onchange="E.perTouched=true;perNote()"></select><div class="muted" id="c-pernote" style="font-size:12px;margin-top:4px"></div>';
@@ -1058,7 +1123,10 @@ function perNote() {
   $('c-pernote').innerHTML = t;
 }
 function halfNote() {
+  if (!$('c-half') || !$('c-amt')) return;
   var a = Number($('c-amt').value) || 0;
+  if (E.whose === 'wata') { $('c-half').innerHTML = a ? '💗 わたちゃんの物として <b>' + yen(a) + '</b> まるごと返してもらうよ' + (E.quick ? '（⚡すぐ）' : '（次の精算で引く）') : 'わたちゃんの物として、まるごと返してもらうよ'; return; }
+  if (E.quick && a) { var c0 = Math.floor(a / 2); $('c-half').innerHTML = '💙 ちぇちゃん ' + yen(c0) + ' ・ 💗 わたちゃん ' + yen(a - c0) + '<br>⚡ わたちゃんに <b>' + yen(a - c0) + ' すぐ返して</b>って出るよ（精算からは引かない）'; return; }
   var c = Math.floor(a / 2), w = a - c; // 1円のはしたはわたちゃん側
   $('c-half').innerHTML = a ? '💙 ちぇちゃん ' + yen(c) + ' ・ 💗 わたちゃん ' + yen(w) + ' の2行に分けて入れるよ（メモに合計 ' + yen(a) + '）。<br>ちぇちゃんがわたちゃんに渡す金額が <b>' + yen(w) + ' 減る</b>よ' : '半分ずつ、ちぇちゃんとわたちゃんの2行に分けて入れるよ';
 }
@@ -1146,12 +1214,12 @@ function shrink(file, max) {
 }
 function saveChe() {
   var e = { id: E.id, period: $('c-per').value, date: $('c-date').value.replace(/-/g, '/'), name: $('c-name').value, amount: $('c-amt').value,
-    payType: E.payType, category: $('c-cat').value, memo: $('c-memo').value };
+    payType: E.payType, category: $('c-cat').value, memo: $('c-memo').value, whose: E.whose || 'half', quick: !!E.quick };
   // 2026-11-27（本人：ちぇちゃん画面も早く）→ すぐ閉じて、保存と計算は裏で。失敗したら入れた内容のまま開き直す
   var html = $('sheet').innerHTML, keep = {}, eid = E;
   Array.prototype.forEach.call($('sheet').querySelectorAll('input,select,textarea'), function (x) { if (x.id && x.type !== 'file') keep[x.id] = x.value; });
-  var other = e.period !== S.period;
-  closeSheet(); toast((other ? Number(e.period.slice(5)) + '月分に' : '') + '保存したよ・わたちゃん負担 ' + yen(Number(e.amount) - Math.floor(Number(e.amount) / 2)));
+  var other = e.period !== S.period, wAmt = e.whose === 'wata' ? Number(e.amount) : Number(e.amount) - Math.floor(Number(e.amount) / 2);
+  closeSheet(); toast((other ? Number(e.period.slice(5)) + '月分に' : '') + '保存したよ・わたちゃんの分 ' + yen(wAmt) + (e.quick ? '（すぐ返してって伝えたよ⚡）' : ''));
   call('saveChePaid', e).then(function (m) { if (m.info.period === S.period) setMonth(m); })
     .catch(function (er) {
       E = eid; openSheet(html); Object.keys(keep).forEach(function (k) { if ($(k)) $(k).value = keep[k]; });
@@ -1182,17 +1250,19 @@ function viewCheSum() {
   c += '<tr class="tot"><td class="op">÷2</td><td>ひとり分</td><td>' + yen(s.perPerson) + '</td></tr>';
   c += '<tr><td colspan="3" class="sec" style="color:var(--che)">💙 ちぇちゃん</td></tr>';
   c += '<tr><td class="op"></td><td>お家の半分</td><td>' + yen(s.perPerson) + '</td></tr>';
-  c += '<tr><td class="op">＋</td><td>ちぇちゃんだけの買い物</td><td>' + yen(s.cheDetail - (s.chePaidChe || 0)) + '</td></tr>';
+  c += '<tr><td class="op">＋</td><td><a onclick="openCheMine()">ちぇちゃんだけの買い物 ›</a></td><td>' + yen(s.cheDetail - (s.chePaidChe || 0)) + '</td></tr>';
   m.itemsChe.forEach(function (i) { c += '<tr><td class="op">＋</td><td>' + esc(i.name) + '</td><td>' + (i.amount === '' || i.amount === null ? '<span style="color:var(--warn)">まだ</span>' : yen(i.amount)) + '</td></tr>'; });
   if (s.chePaidWata) c += '<tr><td class="op">−</td><td>立て替え（わた半分）</td><td>' + yen(s.chePaidWata) + '</td></tr>';
   c += '<tr class="tot"><td class="op">＝</td><td>わたちゃんへ</td><td>' + yen(s.che) + '</td></tr></table>';
+  if (s.quickWata) c += '<div class="muted" style="font-size:12px;margin-top:6px">⚡ すぐ返してもらう分 ' + yen(s.quickWata) + ' は、ここでは引かないよ（わたちゃんが別で払う）</div>';
   h += fold('cfold-calc', '🧾 計算', '', c);
   var list = function (id, title, f) {
     var xs = m.txs.filter(f), tot = xs.reduce(function (a, t) { return a + t.amount; }, 0), r = '<div class="list" style="margin:0">';
     if (!xs.length) r += '<div class="empty">なし</div>';
     xs.forEach(function (t) {
       var mineP = t.payer === 'ちぇちゃん', nn = niceName(t);
-      r += '<div class="item"' + (mineP ? ' onclick="openChe(\'' + esc(t.id) + '\')"' : ' style="cursor:default"') + '><span class="dot ' + (t.who === 'お家' ? 'oie' : 'che') + '"></span><div class="mid"><div class="t">' + esc(nn.name) + (mineP ? ' 💙' : '') + '</div><div class="s">' + md(t.date) + '・' + esc(t.category || 'その他') + '</div></div><div class="a num">' + yen(t.amount) + '</div></div>';
+      var tap = mineP ? 'openChe(\'' + esc(t.id) + '\')' : (t.who === 'ちぇちゃん' ? 'openCheCat(\'' + esc(t.id) + '\')' : '');
+      r += '<div class="item"' + (tap ? ' onclick="' + tap + '"' : ' style="cursor:default"') + '><span class="dot ' + (t.who === 'お家' ? 'oie' : 'che') + '"></span><div class="mid"><div class="t">' + esc(nn.name) + (mineP ? ' 💙' : '') + '</div><div class="s">' + md(t.date) + '・' + esc(t.category || 'その他') + '</div></div><div class="a num">' + yen(t.amount) + '</div></div>';
     });
     return fold(id, title, yen(tot), r + '</div>');
   };
@@ -1210,17 +1280,20 @@ function viewCheKakei() {
     '<div class="sumrow"><div><b>💙 自分</b></div><div style="text-align:right"><b class="num" style="color:var(--che)">' + yen(n.che) + '</b><br>' + diff(n.che, k.prev.che) + '</div></div></div>';
   if (k.up.length) h += '<div class="alert" style="cursor:default">📈 ' + k.up.map(function (u) { return esc(u.category) + ' +' + yen(u.diff); }).join('・') + '</div>';
   h += '<h2>🏠 お家</h2><div class="card">' + donut(n.catOie) + '</div>';
-  h += '<h2>💙 自分</h2><div class="card">' + donut(n.catChe) + '</div>';
+  h += '<h2>💙 自分 <a style="font-size:12px;font-weight:500" onclick="openCheMine()">内訳・カテゴリを直す ›</a></h2><div class="card">' + donut(n.catChe) + '</div>';
   h += '<h2>月ごと</h2><div class="card">' + bars(k.trend) + '</div>';
   return h;
 }
 function viewChePay() {
   var xs = cheGroups(S.m.txs);
   var h = '<button class="chebtn" onclick="openChe()"><span class="ic2">📷</span><span>立て替えた分を入れる</span></button>';
+  var q = S.m.quickReqs || [];
+  if (q.length) h += '<div class="alert" style="cursor:default;margin-top:12px">⚡ すぐ返しての請求中 <b>' + yen(q.reduce(function (a, x) { return a + x.amount; }, 0)) + '</b>（' + q.length + '件）<span class="muted" style="font-size:11px">わたちゃんが払ったら✅になるよ</span></div>';
   h += '<div class="row muted" style="margin:14px 4px 6px"><span>入れた分 ' + xs.length + '件</span><span class="num">' + yen(xs.reduce(function (a, t) { return a + t.total; }, 0)) + '</span></div><div class="list">';
   if (!xs.length) h += '<div class="empty">まだないよ</div>';
   xs.forEach(function (t) {
-    h += '<div class="item" onclick="openChe(\'' + esc(t.id) + '\')"><span class="dot che"></span><div class="mid"><div class="t">' + esc(t.name) + '</div><div class="s">' + md(t.date) + (t.memo ? ' 📝' : '') + '</div></div><div class="a num">' + yen(t.total) + '</div></div>';
+    var badge = t.quick === '請求' ? ' <span style="color:var(--warn);font-size:11px">⚡請求中</span>' : t.quick === '済' ? ' <span style="color:var(--oie);font-size:11px">✅返ってきた</span>' : '';
+    h += '<div class="item" onclick="openChe(\'' + esc(t.id) + '\')"><span class="dot che"></span><div class="mid"><div class="t">' + esc(t.name) + badge + '</div><div class="s">' + md(t.date) + (t.whose === 'wata' ? '・💗わたちゃんの物' : '') + (t.memo ? ' 📝' : '') + '</div></div><div class="a num">' + yen(t.total) + '</div></div>';
   });
   return h + '</div>';
 }
